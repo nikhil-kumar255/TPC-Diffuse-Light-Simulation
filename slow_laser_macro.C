@@ -1,6 +1,23 @@
+//TVector3 drawRandomRayFrom(TH2F* hXY, float d); //draw a ray (angles right, length arbitrary) from a distribution that makes an intensity map hXY a distance d from a source.
+TVector3 DiffusePhoton(TVector3 photon_direction, TF1* angleDist); //modify a vector by two orthogonal random draws from the angle (deg) distribution.
+
+
 void slow_laser_macro() {
 
-	const int nLasers = 12;
+	const int nLasers = 1;
+	int nDiffuser = 0;
+	float laserthetaparameter=0.01;
+	float laser_tilt_angle =  10;
+	//set up the diffuser parameters:
+  //TF1 *fThorAngle=new TF1("fThorAngle","[0]*exp(-0.5*(x/[1])**2)",-30,30);
+  //fThorAngle->SetParameters(1,0.001); //test with very narrow gaussian to make sure we get back what we put in.
+	TF1* fThorAngle = new TF1("fThorAngle", "([0]**2/((x-[1])**2+[0]**2))", -30, 30);
+	fThorAngle->SetParameters(7.5, 0);//thorlabs model is 7.5,0
+	fThorAngle->SetTitle("diffuser angular distribution");
+	//  fThorAngle->Draw();
+	//return;
+
+
 	//incorporate Bob's laser profile
 	float NBins = 540;// Number of Bins in Bob's Histogram
 	float Full_Length = 14;//cm; length of Bob's histogram
@@ -8,7 +25,7 @@ void slow_laser_macro() {
 	TFile* f = TFile::Open("ntuple.root");
 	TNtuple* ntuple = (TNtuple*)(f->Get("ntuple"));
 	TH1F* hIntensity = new TH1F("hIntensity", "Intensity vs Position;position;intensity", NBins, 0, NBins - 1);
-	ntuple->Draw("position>>hIntensity", "intensity");
+	//ntuple->Draw("position>>hIntensity", "intensity");
 	TH2F* h2 = new TH2F("h2", "Filled Test Plane;x position(cm);y position(cm)", NBins, -Full_Length / 2, Full_Length / 2, NBins, -Full_Length / 2, Full_Length / 2);
 	// section to setup "ideal" Gaussian Distribution
 	TH2F* h4 = new TH2F("h4", "Ideal Gaussian", NBins, -Full_Length / 2, Full_Length / 2, NBins, -Full_Length / 2, Full_Length / 2);
@@ -30,6 +47,10 @@ void slow_laser_macro() {
 		double x,y,z;
 		double x_mean = h2->GetMean(1);//Get x mean of Bob's Profile
 		double y_mean = h2->GetMean(2);//Get y mean of Bob's Profile
+
+
+
+
 	//define the basis vectors local to the laser:
 	TVector3 laser_nominal[nLasers];
 	TVector3 laser_transverse[nLasers];
@@ -39,7 +60,7 @@ void slow_laser_macro() {
 	float laser_position_angle0 = 0;
 
 	float angle_increment = 2 * TMath::Pi() / nLasers; // assume they're equally spaced
-	float laser_tilt = 0 * TMath::Pi() / 180; //and have a common tilt, leaning outward in the rz plane,
+	float laser_tilt = laser_tilt_angle * TMath::Pi() / 180; //and have a common tilt, leaning outward in the rz plane,
 
 	//rotate each laser to the proper position and update the beam nominal and transverse direction.
 	for (int i = 0; i < nLasers; i++)
@@ -78,7 +99,7 @@ void slow_laser_macro() {
 	//laser intensity as a function of distance from the beam center:
 	float w0 = 0.1;
 	float zsample = 1.0;//all in cm.
-	float lambda = 600 * 1e-7;//10^-7 converts from nm in cm.
+	float lambda = 266 * 1e-7;//10^-7 converts from nm in cm.
 	float denom = w0 * w0 + lambda * lambda * zsample * zsample / (TMath::Pi() * TMath::Pi() * w0 * w0);
 	float thetamax = TMath::Pi() / 4;
 	float samplemax = 100; //
@@ -90,8 +111,8 @@ void slow_laser_macro() {
 		//TF1 *laser_r=new TF1("laser_r","x/[0]",0,TMath::Tan(thetamax)*zsample); // intensity as function of r
 	laser_r->SetParameter(0, denom);
 	// denom is placeolder for this case
-	TF1* laser_theta = new TF1("laser_theta", "exp(-x/[0])", 0, TMath::Pi() / 2);
-		laser_theta->SetParameter(0, 1);
+	TF1* laser_theta = new TF1("laser_theta", "exp(-x/[0])", 0, TMath::Pi() / 2);//exp(-x/[0])
+		laser_theta->SetParameter(0, laserthetaparameter);
 	//return;
 
 	  //TODO: find a realistic waist
@@ -125,8 +146,13 @@ void slow_laser_macro() {
 	TH2F* hPhotonAngle = new TH2F("hPhotonAngle", "hPhotonAngle;#theta (x);#phi (y)", 50, 0, 2, 50, 0, 6.5);
 	TH2F* hPhotonDirection = new TH2F("hPhotonDirection", "hPhotonDirection; (x); (y)", 50, -2, 2, 50, -2, 2);
 	TH1F* hPhoton = new TH1F("hPhoton", "hPhoton", 100, 0, TMath::Pi());
-
-	int nPhotons = 4000000;
+	//*//Initialize File
+	FILE* pFile;
+	int n;
+	char name[100];
+	pFile = fopen("test_trace.csv", "w");
+    //*//
+	int nPhotons = 1000000;
 	for (int i = 0; i < nPhotons; i++) {
 
 
@@ -135,14 +161,17 @@ void slow_laser_macro() {
 
 		int L = i % nLasers;
 
-
+		////*** standard gaussian laser
+		//*
 		//hPhoton->Fill(laser_shape->GetRandom(),1.0/nPhotons);
-		//double photon_theta = laser_theta->GetRandom();
-		
-		//float photon_phi = laser_phi->GetRandom();
-
+		double photon_theta = laser_theta->GetRandom();
+		float photon_phi = laser_phi->GetRandom();
+		float photon_r = laser_r->GetRandom();
+		//hPhotonAngle->Fill(photon_theta, photon_phi);//fill x and y.  annoying that it's backward from the arguments earlier, but what're you gonna do? ;)
+		//*/
+		//****** end standard gaussian laser
 		//****************Custom Laser fiber section
-		///*
+		/*
 		z = 10;// z=10 cm . from Bob's setup
 		h2->GetRandom2(x, y);
 		x = x - x_mean;
@@ -152,7 +181,7 @@ void slow_laser_macro() {
         double photon_theta = atan2(sqrt(x * x + y * y), z); 
 		//*/
 	    //***************End Custom laser Fiber section
-		//Ideal Laser Fiber section
+		//***************Ideal Laser Fiber section
 		/*
 		z = 10;
 		h4->GetRandom2(x, y);
@@ -160,15 +189,16 @@ void slow_laser_macro() {
 		float photon_r = 0; // placeholder for bob
 		double photon_theta = atan2(sqrt(x * x + y * y), z);
 		//*/
-		//
+		//***************End Ideal laser Fiber section
 
-		//float photon_r = laser_r->GetRandom();
-		//hPhotonAngle->Fill(photon_theta, photon_phi);//fill x and y.  annoying that it's backward from the arguments earlier, but what're you gonna do? ;)
+		
 
 		//************Lens Section
 		float focal_length = 1.0;//focal length in centimeters //float photon_theta=something to do with photon_r
 		//photon_theta = photon_r / focal_length + photon_theta; //thin lens equation angle change. f is focal length for DIVERGING lens
 		//************End Lens Section
+
+
 		TVector3 photon_direction = laser_nominal[L];
 		//for Nikhil:  photon_direction.Rotate(something to do with photon_theta)
 		photon_direction.Rotate(photon_theta, laser_transverse[L]);
@@ -182,10 +212,59 @@ void slow_laser_macro() {
 		//continue;
 		//double z=photon_position.z();
 		//double photon_theta = atan2(sqrt(x*x+y*y),z);
+
+		//****Diffuser Section
+	//the diffuser adds an additional random set of rotations w.r.t. the photon direction
+	//rather than rotate theta and phi around the photon axis, we will get two orthogonal vectors relative to the photon direction, and do a 'rotate about x axis' followed by a 'rotate about y axis' in that frame:
+		//change diffuser to loop
+		//*//
+		float percentile = 68;// note 68.35 for 10-220, 57.6 for 10-120
+		
+		bool islost = false;
+		for (int i = 0; i < nDiffuser; i++) {
+			photon_direction = DiffusePhoton(photon_direction, fThorAngle);
+			float rand1 = rand() % 100; //random
+				if (rand1 > percentile) { //out of probability range, photon is absorbed}
+					islost = true;
+				break; //skip to the next iteration through the loop
+				}
+		}
+		if (islost) { //out of probability range, photon is absorbed}
+			continue; //skip to the next iteration through the loop
+		}
+		//*/
+		//Absorbtion
+		//random number draw
+		/*
+		
+		
+		float rand2 = rand() % 100;
+		float rand3 = rand() % 100;
+		float rand4 = rand() % 100;
+		//Diffuser 1
+		
+		//Diffuser 2
+		if (rand2 > percentile) { //out of probability range}
+			continue; //skip to the next iteration through the loop
+		}
+		//Diffuser 3
+		if (rand3 > percentile) { //out of probability range}
+			continue; //skip to the next iteration through the loop
+		}
+		//Diffuser 4
+		if (rand4 > percentile) { //out of probability range}
+			continue; //skip to the next iteration through the loop
+		}
+		//*/
+		/// End Diffuser Section
+
+		//find the position where this photon intersects the CM:
 		float denominator = photon_direction.Dot(surface_normal);
 		if (denominator < 0.001) { //parallel to surface.  no solution}
 			continue; //skip to the next iteration through the loop
 		}
+
+
 		TVector3 intersect = (surface_normal.Dot(surface_point - photon_position) / denominator) * photon_direction + photon_position;
 		//if (intersect.X() * intersect.X() + intersect.Y() * intersect.Y() < 297.5625) { continue; }  // exclude solutions that end in center\
 		//if (laser_position[L].X() < 0){if laser_position[L].Y() < 0} { continue; }  // exclude solutions that end in center
@@ -201,12 +280,18 @@ void slow_laser_macro() {
 		double y_0 = photon_position.y();
 		double v_z = photon_direction.z();
 		double z_0 = photon_position.z();
+		
+		
+		fprintf(pFile,"%f, %f, %f, %f, %f, %f,1\n", x_0,y_0,z_0,v_x, v_y, v_z);
+		
+		
 		/*double b = -16 * v_x * v_x * y_0 * y_0 + 4761 * v_x * v_x + 32 * v_x * v_y * x_0 * y_0 - 16 * v_y * v_y * x_0 * x_0 + 4761*v_y * v_y;*/
         /*double c = v_x * v_x + v_y * v_y;*/
 		//Generalized Parameters b & c for TPC of variable inner field cage radius 
 		double b = (-2 * v_x * x_0 - 2 * v_y * y_0) * (-2 * v_x * x_0 - 2 * v_y * y_0) - 4 * (-v_x * v_x - v_y * v_y) *(R * R - x_0 * x_0 - y_0 * y_0); 
 		double b_out = (-2 * v_x * x_0 - 2 * v_y * y_0) * (-2 * v_x * x_0 - 2 * v_y * y_0) - 4 * (-v_x * v_x - v_y * v_y) * (R_out * R_out - x_0 * x_0 - y_0 * y_0);
 		double c = 2*(v_x*v_x + v_y*v_y);
+		
 		if (b >= 0 && c > 0) {
 			/*double t_1 = (-sqrt(b) - 4*v_x * x_0 - 4*v_y * y_0) / (4*c);*/
 			/*double t_2 = (sqrt(b) - 4*v_x * x_0 - 4*v_y * y_0) / (4 * c);*/
@@ -215,6 +300,7 @@ void slow_laser_macro() {
 			double t_2 = (sqrt(b) - 2 * v_x * x_0 - 2 * v_y * y_0) / (c);
 			double z_1 = z_0 + v_z * t_1;
 			double z_2 = z_0 + v_z * t_2;
+			//*//begin
 			if ((z_1 > z_0&& z_1 < intersect.z()) || (z_2 > z_0&& z_2 < intersect.z()) ) continue;
 		
 		}
@@ -224,8 +310,10 @@ void slow_laser_macro() {
 			double z_3 = z_0 + v_z * t_3;
 			double z_4 = z_0 + v_z * t_4;
 	if ((z_3 > z_0&& z_3 < intersect.z()) || (z_4 > z_0&& z_4 < intersect.z()))continue;
+		//*/ //END
 		}
-
+		
+		//fprintf(pFile, "%f, %f, %f, %f, %f, %f,1\n", x_0, y_0, z_0, v_x, v_y, v_z);
 		//t = (-sqrt((-2 v_x x_0 - 2 v_y y_0)^2 - 4 (-v_x^2 - v_y^2) (R^2 - x_0^2 - y_0^2)) - 2 v_x x_0 - 2 v_y y_0)/(2 (v_x^2 + v_y^2))
 	
 	    //Double_t m = photon_direction.Mag();
@@ -255,19 +343,24 @@ void slow_laser_macro() {
 	  hPhotonAtSurface->Fill(intersect.X(),intersect.Y());
 		 */
 	}
+	// END of photon code
+	///*
+	fclose(pFile);
+	//*/
+
 	//hPhotonDirection->Draw("colz");
 	//hPhotonAngle->Draw("colz");
 	//hPhotonAtSurface->Draw("surf1");
 	// Reference h2->Fill(x_i, y_i, hIntensity->GetBinContent(hIntensity->FindBin(x_0_i)) * hIntensity->GetBinContent(hIntensity->FindBin(y_0_i)));
 	// rEFERENCE TH1F("hIntensity", "Intensity vs Position;position;intensity", NBins, 0, NBins - 1);
 	//********** 
-	//              Ideal gaussian Slice, angular distribution
-	//TH1D* px = hPhotonAtSurface->ProjectionX("px", -100, 100); // where firstYbin = -100 and lastYbin = 100 //******original attempt
+	//*//              Ideal gaussian Slice, angular distribution
+	//TH1D* px = hPhotonAtSurface->ProjectionX("px", -100, 100); // where firstYbin = -100 and lastYbin = 100 //original attempt
 	TH1D* px = new TH1D("px", "Position vs Intensity;Position;Intensity", 201, -100, 100);
-	TH1D* pax = new TH1D("pax", "Angle vs Intensity;Angle;Intensity",30, - 30, 30);
+	TH1D* pax = new TH1D("pax", "Angle vs Intensity;Angle;Intensity",20, - 30, 30);
 	double xI, yI;
 	double zI = 100;//distance of fiber to CM
-	double yPORT = 60; //cm; trial method to create slice histogram 
+	double yPORT = 40; //cm; trial method to create slice histogram 
 	double R_out = 80;
 	
 	for (int i = 0; i < 2*R_out+1; i++) {
@@ -280,27 +373,77 @@ void slow_laser_macro() {
 		pax->Fill(ThetaI, px->GetBinContent(px->FindBin(xI_0)));
 	}
 	//double PhiI = atan2(yI, xI);
-	pax->Draw("hist");
-	//**********
+	//px->Draw("hist");
+	//*///**********
 
 
 	//*****************************
 	//Draw photons striking cm with all given previous conditions
-	/*
-	hPhotonAtSurface->Draw("colz");
+	//*
+	//hPhotonAtSurface->Draw("colz");
 	//*/
 	//*****************************
+
+	//
+	TCanvas* c = new TCanvas("c", "c", 600, 900);
+	c->Divide(2, 3);
+	int nCells = hPhotonAtSurface->GetNcells();//total number of bins in histogram
+	TH1F* hIntensityProfile = new TH1F("hIntensityProfile", "Histogram of Intensity per bin;intensity;nbins", 100, 1, 5 * nPhotons / nCells);
+	TH1F* hIntensityRadius = new TH1F("hIntensityRadius", "Mean Intensity vs Radius;radius;mean intensity", 100, 0, 100);
+	TH1F* hIntensityTheta = new TH1F("hIntensityTheta", "Mean Intensity vs Angle;Theta;mean intensity", 50, - (1 / 2) * TMath::Pi(), (1 / 2) * TMath::Pi());
+	TH1F* hRadius = new TH1F("hRadius", "nbins vs radius, for normalization;radius;nbins", 100, 0, 100);
+	TH1F* hTheta = new TH1F("hTheta", "nbins vs Angle(Theta), for normalization;Theta;nbins", 50, 0, (1/2)*TMath::Pi());
+	c->cd(1);
+	fThorAngle->Draw();
+	c->cd(2);
+	pax->Draw("hist");
+	c->cd(3);
+	hPhotonAtSurface->Draw("colz");
+	c->cd(4);
+	for (int i = 0; i < nCells; i++) {
+		float content = hPhotonAtSurface->GetBinContent(i);
+		int binx, biny, binz;
+		hPhotonAtSurface->GetBinXYZ(i, binx, biny, binz);//get the per-axis bins for this global bin
+		float xpos = hPhotonAtSurface->GetXaxis()->GetBinCenter(binx);
+		float ypos = hPhotonAtSurface->GetYaxis()->GetBinCenter(biny);
+		float zpos = 100;
+		float radius = sqrt(xpos * xpos + ypos * ypos);
+		float theta = atan2(radius, zpos);
+		hIntensityProfile->Fill(content);
+		hIntensityRadius->Fill(radius, content);
+		hIntensityTheta->Fill(theta, content);
+		hRadius->Fill(radius);
+		hTheta->Fill(theta);
+	}
+	hIntensityProfile->Draw();
+	c->cd(5);
+	hIntensityRadius->Divide(hRadius);
+	hIntensityRadius->Draw("hist");
+	c->cd(6);
+	hIntensityTheta->Divide(hTheta);
+	hIntensityTheta->Draw("hist");
+	//
 
 	//hPhoton->Draw("same");
 	return;
 }
 
-/* things you can look up/do:
-rebuild in matlab
-figure out rotations needed.
-get some testable cases to confirm
-pick an interesting option or two:
-gaussian from last time at (0,0,1) check it looks the same
-gaussian from last time at 30 degrees radially outward.
-figure out if there is a root package for lookign at where lines cross planes -- if not, write the equations for it.
-*/
+TVector3 drawRandomRayFrom(TH2F* hXY, float d) {
+	//draw a ray (angles right, length arbitrary) from a distribution that makes an intensity map hXY a distance d from a source.
+	double x, y;
+	hXY->GetRandom2(x, y);
+	float x_mean = hXY->GetMean(1);
+	float y_mean = hXY->GetMean(2);
+	TVector3 ray(x - x_mean, y - y_mean, d);
+	return ray;
+}
+
+TVector3 DiffusePhoton(TVector3 photon_direction, TF1* angleDist) {
+	//assume distribution is 1D, uncorrelated, so that we can apply two independent orthogonal rotations.
+	TVector3 localA = photon_direction.Orthogonal();//we have no intrinsic guarantee /which/ orthogonal direction this is
+	TVector3 localB = photon_direction.Cross(localA);//but we know that p x A will be orthogonal to both p and A, so these suffice.
+	photon_direction.Rotate(TMath::Pi() / 180 * angleDist->GetRandom(), localA);//convert to radians and rotate around A
+	photon_direction.Rotate(TMath::Pi() / 180 * angleDist->GetRandom(), localB);//then convert to radians and rotate  around B.
+	return photon_direction;
+}
+
