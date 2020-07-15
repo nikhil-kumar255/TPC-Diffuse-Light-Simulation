@@ -1,10 +1,10 @@
-TVector3 DrawRandomRayFrom(TH2F* hXY, float d); //draw a ray (angles right, length arbitrary) from a distribution that makes an intensity map hXY a distance d from a source.
-TVector3 DiffusePhoton(TVector3 photon_direction, TF1* angleDist); //modify a vector by two orthogonal random draws from the angle (deg) distribution.
-bool HitsCylinder(TVector3 photon_direction, TVector3 photon_origin, float radius, float zf ); //return true if a photon traverses a cylinder  of radius r between its starting point and zf
-bool HitsIFC(TVector3 photon_direction, TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 17.25,100.0);};
-bool HitsOFC(TVector3 photon_direction, TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 80.0,100.0);};
-TH2F* LoadLaserProfileFromFile(char *profname, char*tuplefile, char *tuplename, float length);//build a 2D intensity profile from a file containing a 1D ntuple, and name the resulting profile 'profname'.  The total number of entries span a length of 'length' in cm.
-TH2F* LoadLaserProfileFromGaussian(char *profname, float sigma, float length); //build a 2D intensity profile from a 1D gaussian with sigma 'sigma'cm spanning a length 'length' in cm.
+const TVector3 DrawRandomRayFrom(TH2F* hXY, float d); //draw a ray (angles right, length arbitrary) from a distribution that makes an intensity map hXY a distance d from a source.
+const TVector3 DiffusePhoton(const TVector3 photon_direction, TF1* angleDist); //modify a vector by two orthogonal random draws from the angle (deg) distribution.
+bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_origin, float radius, float zf ); //return true if a photon traverses a cylinder  of radius r between its starting point and zf
+bool HitsIFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 17.25,100.0);};
+bool HitsOFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 80.0,100.0);};
+TH2F* LoadLaserProfileFromFile(const char *profname,const char*tuplefile,const char *tuplename, float length);//build a 2D intensity profile from a file containing a 1D ntuple, and name the resulting profile 'profname'.  The total number of entries span a length of 'length' in cm.
+TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length); //build a 2D intensity profile from a 1D gaussian with sigma 'sigma'cm spanning a length 'length' in cm.
 
 
 //and the main feature:  set up n lasers at a definted tilt angle and a specified itnensity on a card at a distace dist away.
@@ -387,7 +387,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 //****Support Functions:
 //and the supporting functions:
 
-TVector3 DrawRandomRayFrom(TH2F* hXY, float d) {
+const TVector3 DrawRandomRayFrom(TH2F* hXY, float d) {
   //draw a ray (angles right, length 1) from a distribution that makes an intensity map hXY a distance d from a source.
   //we center it automatically in this code, so it does not need to be centered in advance.
   double x, y;
@@ -398,16 +398,18 @@ TVector3 DrawRandomRayFrom(TH2F* hXY, float d) {
   return ray.Unit(); //return a unit vector parallel to ray.
 }
 
-TVector3 DiffusePhoton(TVector3 photon_direction, TF1* angleDist) {
+const TVector3 DiffusePhoton(const TVector3 photon_direction, TF1* angleDist) {
   //assume distribution is 1D, uncorrelated, so that we can apply two independent orthogonal rotations.
-  TVector3 localA = photon_direction.Orthogonal();//we have no intrinsic guarantee /which/ orthogonal direction this is
-  TVector3 localB = photon_direction.Cross(localA);//but we know that p x A will be orthogonal to both p and A, so these suffice.
-  photon_direction.Rotate(TMath::Pi() / 180 * angleDist->GetRandom(), localA);//convert to radians and rotate around A
-  photon_direction.Rotate(TMath::Pi() / 180 * angleDist->GetRandom(), localB);//then convert to radians and rotate  around B.
-  return photon_direction;
+  TVector3 output_direction=photon_direction;
+  
+  TVector3 localA = output_direction.Orthogonal();//we have no intrinsic guarantee /which/ orthogonal direction this is
+  TVector3 localB = output_direction.Cross(localA);//but we know that p x A will be orthogonal to both p and A, so these suffice.
+  output_direction.Rotate(TMath::Pi() / 180 * angleDist->GetRandom(), localA);//convert to radians and rotate around A
+  output_direction.Rotate(TMath::Pi() / 180 * angleDist->GetRandom(), localB);//then convert to radians and rotate  around B.
+  return output_direction;
 }
 
-bool HitsCylinder(TVector3 photon_direction, TVector3 photon_position, float radius, float zf ){
+bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_position, float radius, float zf ){
   //return true if a photon traverses a cylinder of radius r between its starting point and zf
 
   float vx = photon_direction.x();
@@ -442,7 +444,7 @@ bool HitsCylinder(TVector3 photon_direction, TVector3 photon_position, float rad
 }
 
 
-TH2F* LoadLaserProfileFromFile(char *profname, char*tuplefile, char *tuplename, float length){
+TH2F* LoadLaserProfileFromFile(const char *profname,const char*tuplefile,const char *tuplename, float length){
   TFile* f = TFile::Open("ntuple.root");
   TNtuple* ntuple = (TNtuple*)(f->Get("ntuple"));
   float NBins = ntuple->GetEntries();//540;// Number of Bins in Bob's Histogram
@@ -463,7 +465,7 @@ TH2F* LoadLaserProfileFromFile(char *profname, char*tuplefile, char *tuplename, 
   return hist;
 }
 
-TH2F* LoadLaserProfileFromGaussian(char *profname, float sigma, float length){
+TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length){
   gRandom = new TRandom3();
   double sigma_ideal = sigma;
   double sigma_y = sigma_ideal;
