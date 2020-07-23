@@ -1,14 +1,14 @@
 const TVector3 DrawRandomRayFrom(TH2F* hXY, float d); //draw a ray (angles right, length arbitrary) from a distribution that makes an intensity map hXY a distance d from a source.
 const TVector3 DiffusePhoton(const TVector3 photon_direction, TF1* angleDist); //modify a vector by two orthogonal random draws from the angle (deg) distribution.
 TH2F* LoadLaserProfileFromFile(const char *profname,const char*tuplefile,const char *tuplename, float length);//build a 2D intensity profile from a file containing a 1D ntuple, and name the resulting profile 'profname'.  The total number of entries span a length of 'length' in cm.
-
+TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length); //build a 2D intensity profile from a 1D gaussian with sigma 'sigma'cm spanning a length 'length' in cm.
 																			   
 																			   /*
 
 bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_origin, float radius, float zf ); //return true if a photon traverses a cylinder  of radius r between its starting point and zf
 bool HitsIFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 17.25,100.0);};
 bool HitsOFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 80.0,100.0);};
-TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length); //build a 2D intensity profile from a 1D gaussian with sigma 'sigma'cm spanning a length 'length' in cm.
+
 //*/
 
 //and the main feature:  set up n lasers at a definted tilt angle and a specified itnensity on a card at a distace dist away.
@@ -36,16 +36,16 @@ void slow_laser_macro_auto() {
   //thorlabs diffuser with a by-hand fit to the model on their page
   TF1* fThorAngle = new TF1("fThorAngle", "([0]**2/((x-[1])**2+[0]**2))", -30, 30);
   fThorAngle->SetParameters(7.5, 0);//thorlabs model is 7.5,0
-  fThorAngle->SetTitle("diffuser angular distribution;angle (deg);arb. prob.");
+  fThorAngle->SetTitle("Thorlabs diffuser angular distribution;angle (deg);arb. prob.");
   float thorTransPercentile= 68;// note 68.35 for 10-220, 57.6 for 10-120
 	68;//percent.
 
   TH2F* hIntensity;
   //load Bob's sculpted-tip laser profile from file:
-  hIntensity=LoadLaserProfileFromFile("SculptedTip","ntuple.root","ntuple",14.0);
+  //hIntensity=LoadLaserProfileFromFile("SculptedTip","ntuple.root","ntuple",14.0);
   float dist=10.0;//
   //load a gaussian laser profile:
-  //hIntensity=LoadLaserProfileFromGaussian("PureGaussianSig7",7.0,14.0);
+  hIntensity=LoadLaserProfileFromGaussian("PureGaussianSig7",7.0,14.0);
 
   //now you can make loops that run this multiple times, if you like.
   SimulateLasers(12,10,hIntensity,10.0,
@@ -68,7 +68,17 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   float laser_position_angle0 = 0;
 
   float angle_increment = 2 * TMath::Pi() / nLasers; // assume they're equally spaced
-  float laser_tilt = laser_tilt_angle * TMath::Pi() / 180; //and have a common tilt, leaning outward in the rz plane,
+
+  //define the parameters of the laser stack:
+  float laser_tilt = laser_tilt_angle * TMath::Pi() / 180; //and have a common tilt, leaning outward in the rz plane.
+  nPrisms=1; //hard-wired for now.
+  float prism_normal_theta_deg[]={0,10}; //one for each facet positive=tilted out
+  float prism_normal_phi_deg[]={0,0}; //one for each facet positive=image rotated CW on the CM
+  float prism_index[]={1.0,1.2,1.0};//one for each region separated by a facet
+
+  
+  TVector3 prism_normal[nLasers][nPrisms*2];
+  //define 
 
   //rotate each laser to the proper position and update the beam nominal and transverse direction.
   for (int i = 0; i < nLasers; i++)
@@ -86,6 +96,15 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
       laser_transverse[i].RotateZ(laser_position_angle0 + angle_increment * i);
       //rotate the position of the laser:
       laser_position[i].RotateZ(laser_position_angle0 + angle_increment * i);
+
+      for (int j=0;j<nPrisms*2;j++){
+	//set up the nominal orientation if this were at (x=0,y>0):
+	prism_normal[i][j].SetXYZ(0,0,1);
+	prism_normal[i][j].RotateX(prism_normal_theta_deg[j]* TMath::Pi() / 180); 
+	prism_normal[i][j].RotateZ(prism_normal_phi_deg[j]* TMath::Pi() / 180);
+	//rotate this for the actual position of this laser stack:
+	prism_normal[i][j].RotateZ(laser_position_angle0+angle_increment*i);
+      }
     }
 
 
@@ -134,10 +153,11 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 
   //when in doubt, google "root [class]" like "root TH2F"
   // TH2F(name, title and axes, number of bins, minimum coordinate, maximum, number of y bins, minimum, maximum)
-  TH2F* hPhotonAtSurface = new TH2F("hPhotonAtSurface", "Photon Position AtSurface;x(cm);y(cm)",80, -100, 100, 80, -100, 100);
+  TH2F* hPhotonAtSurface = new TH2F("hPhotonAtSurface", "Photon Position At CM;x(cm);y(cm)",80, -100, 100, 80, -100, 100);
   TH2F* hPhotonAngle = new TH2F("hPhotonAngle", "Photon Angle;#theta (x);#phi (y)", 50, 0, 2, 50, 0, 6.5);
   TH1F* hPreDiffusionAngle = new TH1F("hPreDiffusionAngle", "Photon Y Angle Before Diffusion;#theta (deg)", 50, -45, 45);
   TH1F* hPostDiffusionAngle = new TH1F("hPostDiffusionAngle", "Photon Y Angle After Diffusion;#theta (deg)", 50, -45, 45);
+  TH2F* hPrismDeflection = new TH2F("hPrismDeflection", "Photon Angle before and after prism;#theta (pre);#theta (post)", 50,-10, 180, 50, -10, 180);
   TH2F* hPhotonDirection = new TH2F("hPhotonDirection", "hPhotonDirection; (x); (y)", 50, -2, 2, 50, -2, 2);
   TH1F* hPhoton = new TH1F("hPhoton", "hPhoton", 100, 0, TMath::Pi());
   //*//Initialize File
@@ -208,9 +228,9 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
     // about x axis' followed by a 'rotate about y axis' in that frame:
 
     //angle before the diffuser, for our records.  by fiat, let's always measure the 1D angular spread as the spread in the XZ plane:  y=0;
-    TVector3 xz_dir_pre_diffusion=photon_direction;
-    xz_dir_pre_diffusion.SetY(0);
-    hPreDiffusionAngle->Fill(xz_dir_pre_diffusion.Theta()*180/TMath::Pi());
+    TVector3 xz_dir_pre=photon_direction;
+    xz_dir_pre.SetY(0);
+    hPreDiffusionAngle->Fill(xz_dir_pre.Theta()*180/TMath::Pi());
 		
 		
     bool islost = false;
@@ -224,27 +244,27 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
     }
 
     //for now, let's always measure the 1D angular spread as the spread in the XZ plane:  y=0;
-    TVector3 xz_dir_post_diffusion=photon_direction;
-    xz_dir_post_diffusion.SetY(0);
-    hPostDiffusionAngle->Fill(xz_dir_post_diffusion.Theta()*180/TMath::Pi());
+    TVector3 xz_dir_post=photon_direction;
+    xz_dir_post.SetY(0);
+    hPostDiffusionAngle->Fill(xz_dir_post.Theta()*180/TMath::Pi());
    if (islost) continue; //skip to the next photon
 
    //end of diffuser
 
    //****Prism Section
-   int nprisms = 1;
-   float nIndex1 = 1; // index before prism
-   float nIndex2 = 1.5; // index inside prism
-   float nIndex3 = 1.2; // index afterprism
-   float prism_angle = 45 * TMath::Pi() / 180;
-   // float theta1 = atan2;
-   //if (nprisms == 1) {
-	   //float theta2 = asin(nIndex1*sin(theta1)/nIndex2);
-
-
-   //}
-   //something about how many prisms (generally zero or one?)
-   //and what to do with the angles and indices given...
+   xz_dir_pre=photon_direction;
+   for (int k=0;k<nPrisms*2;k++){
+     float theta_before=photon_direction.Angle(-prism_normal[L][k]);//angle with respect to the (backward-facing) normal of the kth facet of prism L.
+     float theta_after=asin(prism_index[k]/prism_index[k+1]*sin(theta_before));//angle we want for the outgoing photon wrt the (forward-facing)normal.
+     TVector3 ortho=photon_direction.Cross(prism_normal[L][k]);//the rotation axis perpendicular to the prism and photon normals.
+     photon_direction=prism_normal[L][k]; //to get the new direction, start with the normal vector
+     photon_direction.Rotate(theta_after,ortho);//then rotate about the orthogonal direction the specified amount.
+     //should consider critical angle of total internal reflection, too, just to be thorough...
+   }
+   //need to consider reflections and other light losses at some point.   
+   xz_dir_post=photon_direction;
+   hPrismDeflection->Fill(xz_dir_pre.Theta()*180/3.14,xz_dir_post.Theta()*180/3.14);
+   
    
    //end of prism
 
@@ -305,8 +325,6 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   //*****************************
 
   //Draw a lot of useful histograms:
-  TCanvas* c = new TCanvas(canvasname, canvasname, 600, 900);
-  c->Divide(2, 3);
   int nCells = hPhotonAtSurface->GetNcells();//total number of bins in histogram
   TH1F* hIntensityProfile = new TH1F("hIntensityProfile", "Histogram of Intensity per bin;intensity;nbins", 100, 1, 5 * nPhotons / nCells);
   TH1F* hIntensityRadius = new TH1F("hIntensityRadius", "Mean Intensity vs Radius;radius;mean intensity", 100, 0, 100);
@@ -347,16 +365,20 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   float high_ave=hIntensityRadius->Integral(bounds[2][0],bounds[2][1])/diffs[2];
   float ratio_ave=central_ave/low_ave; // how much brighter is central than low?
   float asymmetry=(low_ave-high_ave)/(low_ave+high_ave); //how much brighter is low than high?
-  
-  c->cd(1);
-  diffAngleProfile->Draw();
-  c->cd(2);
-  pax->Draw("hist");
-  c->cd(3);
-  hPhotonAtSurface->Draw("colz");
-  c->cd(4);
 
-  
+  TCanvas* c = new TCanvas(canvasname, canvasname, 600, 900);
+  c->Divide(2, 3);
+  c->cd(1);
+  hIntensity->Draw("colz");
+  c->cd(2);
+  diffAngleProfile->Draw();
+  c->cd(3);
+  hPrismDeflection->Draw("colz");
+  c->cd(4);
+  hPhotonAtSurface->Draw("colz");
+  c->cd(5);
+  hIntensityRadius->Draw("hist");
+  c->cd(6);  
   float texpos=0.9;float texshift=0.08;
   TLatex *tex=new TLatex(0.0,texpos,Form("PhotonSource=%s",hIntensity->GetName()));
   tex->Draw();texpos-=texshift; //draw this line and shift our position down to be ready for the next line
@@ -380,17 +402,11 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
     tex=new TLatex(0.0,texpos,Form("Outer and Inner approximately balanced."));
   }
   tex->Draw();texpos-=texshift;
-
-  c->cd(5);
-  hIntensityRadius->Draw("hist");
-  c->cd(6);
-  hIntensityTheta->Draw("hist");
   //
   //c->SaveAs(Form("%s.pdf",canvasname);
 
   return;
-}
-
+    }
 
 
 
@@ -459,8 +475,8 @@ bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_positio
 //*/
 //*
 TH2F* LoadLaserProfileFromFile(const char *profname,const char*tuplefile,const char *tuplename, float length){
-  TFile* f = TFile::Open("ntuple.root");
-  TNtuple* ntuple = (TNtuple*)(f->Get("ntuple"));
+  TFile* f = TFile::Open(tuplefile);
+  TNtuple* ntuple = (TNtuple*)(f->Get(tuplename));
   float NBins = ntuple->GetEntries();//540;// Number of Bins in Bob's Histogram
   TH1F* hIntensity = new TH1F("hIntensity", "Intensity vs Position;position;intensity", NBins, 0, NBins);
   ntuple->Draw("position>>hIntensity", "intensity","goff");
@@ -470,9 +486,9 @@ TH2F* LoadLaserProfileFromFile(const char *profname,const char*tuplefile,const c
 
   TH2F* hist = new TH2F(Form("h%s",profname), Form("2D Output from %s;x position(cm);y position(cm)",profname), NBins, -Full_Length / 2, Full_Length / 2, NBins, -Full_Length / 2, Full_Length / 2);
   for (int i = 0; i < NBins; i++) {
-    float x_i = (-Full_Length / 2) + i * Fiber_Scale;
+    float x_i = (-Full_Length / 2) + (i+0.5) * Fiber_Scale;
     for (int j = 0; j < NBins; j++) {
-      float y_i = (-Full_Length / 2) + j * Fiber_Scale;
+      float y_i = (-Full_Length / 2) + (j+0.5) * Fiber_Scale;
       hist->Fill(x_i, y_i, hIntensity->GetBinContent(hIntensity->FindBin(i)) * hIntensity->GetBinContent(hIntensity->FindBin(j)));
     }
   }
@@ -480,14 +496,13 @@ TH2F* LoadLaserProfileFromFile(const char *profname,const char*tuplefile,const c
 }
 //*/
 
-/*
+
 TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length){
-  gRandom = new TRandom3();
   double sigma_ideal = sigma;
   double sigma_y = sigma_ideal;
   double sigma_x = sigma_ideal;
   
-  float NBins = 100;
+  int NBins = 100;
   float Full_Length = length;//cm; length of histogram
   float Fiber_Scale = Full_Length / NBins; // Length of one bin in cm
 
@@ -496,12 +511,11 @@ TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float leng
  
 
   for (int i = 0; i < NBins; i++) {
-    float x_i = (-Full_Length / 2) + i * Fiber_Scale;
+    float x_i = (-Full_Length / 2) + (i+0.5) * Fiber_Scale;
     for (int j = 0; j < NBins; j++) {
-      float y_i = (-Full_Length / 2) + j * Fiber_Scale;
+      float y_i = (-Full_Length / 2) + (j+0.5) * Fiber_Scale;
       hist->Fill(x_i, y_i, exp(-2 * ((x_i * x_i) / (sigma_x * sigma_x) + (y_i * y_i) / (sigma_y * sigma_y))));
     }
   }
   return hist;
 }
-//*/
