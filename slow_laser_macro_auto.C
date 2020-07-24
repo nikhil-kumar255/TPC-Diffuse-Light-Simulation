@@ -2,12 +2,12 @@ const TVector3 DrawRandomRayFrom(TH2F* hXY, float d); //draw a ray (angles right
 const TVector3 DiffusePhoton(const TVector3 photon_direction, TF1* angleDist); //modify a vector by two orthogonal random draws from the angle (deg) distribution.
 TH2F* LoadLaserProfileFromFile(const char *profname,const char*tuplefile,const char *tuplename, float length);//build a 2D intensity profile from a file containing a 1D ntuple, and name the resulting profile 'profname'.  The total number of entries span a length of 'length' in cm.
 TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length); //build a 2D intensity profile from a 1D gaussian with sigma 'sigma'cm spanning a length 'length' in cm.
-																			   
-																			   /*
-
 bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_origin, float radius, float zf ); //return true if a photon traverses a cylinder  of radius r between its starting point and zf
 bool HitsIFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 17.25,100.0);};
 bool HitsOFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 80.0,100.0);};
+																			   
+																			   /*
+
 
 //*/
 
@@ -27,7 +27,10 @@ void slow_laser_macro_auto() {
   const int nLasers = 1;
   int nDiffuser = 0;
   float laserthetaparameter=0.01;
-  float laser_tilt_angle =  10;
+  float laser_tilt_angle =  0;
+  float prismAngle = 10;
+  float prismIndex = 1.5;
+  float nPrisms = 1;
   //set up the diffuser parameters:
   //null angle diffuser returns almost exactly what we take in:
   TF1 *fNullAngle=new TF1("fThorAngle","[0]*exp(-0.5*(x/[1])**2)",-30,30);
@@ -35,22 +38,28 @@ void slow_laser_macro_auto() {
 
   //thorlabs diffuser with a by-hand fit to the model on their page
   TF1* fThorAngle = new TF1("fThorAngle", "([0]**2/((x-[1])**2+[0]**2))", -30, 30);
-  fThorAngle->SetParameters(7.5, 0);//thorlabs model is 7.5,0
+  fThorAngle->SetParameters(7.5, 0);//thorlabs model is 7.5, itterating for edmond 50 deg->12 seems fair
   fThorAngle->SetTitle("Thorlabs diffuser angular distribution;angle (deg);arb. prob.");
-  float thorTransPercentile= 68;// note 68.35 for 10-220, 57.6 for 10-120
-	68;//percent.
-
+  float thorTransPercentile= 68.35;// note 68.35 for 10-220, 57.6 for 10-120, 90 for holographic diffuser from edmond
+	//90;//percent.
+   //Edmond optics diffuser with a by-hand fit to the model on their page
+  ///*
+  TF1* fEdAngle = new TF1("fEdAngle", "([0]**2/((x-[1])**2+[0]**2))", -80, 80);
+  fEdAngle->SetParameters(12, 0);//thorlabs model is 7.5, itterating for edmond 50 deg->12 seems fair
+  fEdAngle->SetTitle("Edmond optics diffuser angular distribution;angle (deg);arb. prob.");
+  float EdTransPercentile = 90;// note 68.35 for 10-220, 57.6 for 10-120, 90 for holographic diffuser from edmond
+  //*/
   TH2F* hIntensity;
-  //load Bob's sculpted-tip laser profile from file:
+  //load Bob's sculpted-tip laser profile from file(stored in root/Bin):
   //hIntensity=LoadLaserProfileFromFile("SculptedTip","ntuple.root","ntuple",14.0);
   float dist=10.0;//
   //load a gaussian laser profile:
   hIntensity=LoadLaserProfileFromGaussian("PureGaussianSig7",7.0,14.0);
 
   //now you can make loops that run this multiple times, if you like.
-  SimulateLasers(12,10,hIntensity,10.0,
-		 4,thorTransPercentile,fThorAngle,
-		 0,100,0,0,
+  SimulateLasers(nLasers, laser_tilt_angle,hIntensity,10.0,
+	  nDiffuser,thorTransPercentile,fThorAngle,
+	  nPrisms,100, prismIndex, prismAngle,
 		 "canvas");
    return;
 };
@@ -71,10 +80,10 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 
   //define the parameters of the laser stack:
   float laser_tilt = laser_tilt_angle * TMath::Pi() / 180; //and have a common tilt, leaning outward in the rz plane.
-  nPrisms=1; //hard-wired for now.
-  float prism_normal_theta_deg[]={0,10}; //one for each facet positive=tilted out
+  //nPrisms=1; //hard-wired for now.
+  float prism_normal_theta_deg[]={0,prismAngle}; //one for each facet positive=tilted out
   float prism_normal_phi_deg[]={0,0}; //one for each facet positive=image rotated CW on the CM
-  float prism_index[]={1.0,1.2,1.0};//one for each region separated by a facet
+  float prism_index[]={1.0,prismIndex,1.0};//one for each region separated by a facet
 
   
   TVector3 prism_normal[nLasers][nPrisms*2];
@@ -255,12 +264,18 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
    xz_dir_pre=photon_direction;
    for (int k=0;k<nPrisms*2;k++){
      float theta_before=photon_direction.Angle(-prism_normal[L][k]);//angle with respect to the (backward-facing) normal of the kth facet of prism L.
-     float theta_after=asin(prism_index[k]/prism_index[k+1]*sin(theta_before));//angle we want for the outgoing photon wrt the (forward-facing)normal.
+	 float arg_asin = prism_index[k] / prism_index[k + 1] * sin(theta_before);
+	 if (arg_asin >= 1) { //out of probability range, photon is absorbed}
+		 islost = true;
+		 break; //skip out of this loop
+	 }
+     float theta_after=asin(arg_asin);//angle we want for the outgoing photon wrt the (forward-facing)normal.
      TVector3 ortho=photon_direction.Cross(prism_normal[L][k]);//the rotation axis perpendicular to the prism and photon normals.
      photon_direction=prism_normal[L][k]; //to get the new direction, start with the normal vector
      photon_direction.Rotate(theta_after,ortho);//then rotate about the orthogonal direction the specified amount.
      //should consider critical angle of total internal reflection, too, just to be thorough...
    }
+   if (islost) continue;
    //need to consider reflections and other light losses at some point.   
    xz_dir_post=photon_direction;
    hPrismDeflection->Fill(xz_dir_pre.Theta()*180/3.14,xz_dir_post.Theta()*180/3.14);
@@ -270,8 +285,8 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 
 
    //****Collisions Section
-   //if (HitsIFC(photon_direction,photon_position)) continue;
-   //if (HitsOFC(photon_direction,photon_position)) continue;
+   if (HitsIFC(photon_direction,photon_position)) continue;
+   if (HitsOFC(photon_direction,photon_position)) continue;
 
    
     //find the position where this photon intersects the CM:
@@ -438,7 +453,7 @@ const TVector3 DiffusePhoton(const TVector3 photon_direction, TF1* angleDist) {
   output_direction.Rotate(TMath::Pi() / 180 * angleDist->GetRandom(), localB);//then convert to radians and rotate  around B.
   return output_direction;
 }
-/*
+//*
 bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_position, float radius, float zf ){
   //return true if a photon traverses a cylinder of radius r between its starting point and zf
 
@@ -450,7 +465,7 @@ bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_positio
   float z0 = photon_position.z();
   float R2=radius*radius;
 		
-  //Generalized Parametersfor collision with cylinder of radius R:
+  //Generalized Parameters for collision with cylinder of radius R:
   //from quadratic formula solutions of when a vector intersects a circle:
   float a = vx*vx+vy*vy;
   float b = 2*(vx*x0+vy*y0);
