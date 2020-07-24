@@ -52,9 +52,11 @@ void slow_laser_macro_auto() {
   TH2F* hIntensity;
   //load Bob's sculpted-tip laser profile from file(stored in root/Bin):
   //hIntensity=LoadLaserProfileFromFile("SculptedTip","ntuple.root","ntuple",14.0);
+  hIntensity=LoadLaserProfileFromFile("CleavedSandedTip","Values_Cleaved_Sanded.root","ntuple",14.0);
+  //hIntensity=LoadLaserProfileFromFile("CleavedNotSandedTip","Values_Cleaved_Not_Sanded.root","ntuple",14.0);
   float dist=10.0;//
   //load a gaussian laser profile:
-  hIntensity=LoadLaserProfileFromGaussian("PureGaussianSig7",7.0,14.0);
+  //hIntensity=LoadLaserProfileFromGaussian("PureGaussianSig7",7.0,14.0);
 
   //now you can make loops that run this multiple times, if you like.
   SimulateLasers(nLasers, laser_tilt_angle,hIntensity,10.0,
@@ -109,7 +111,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
       for (int j=0;j<nPrisms*2;j++){
 	//set up the nominal orientation if this were at (x=0,y>0):
 	prism_normal[i][j].SetXYZ(0,0,1);
-	prism_normal[i][j].RotateX(-prism_normal_theta_deg[j]* TMath::Pi() / 180); 
+	prism_normal[i][j].RotateX(prism_normal_theta_deg[j]* TMath::Pi() / 180); 
 	prism_normal[i][j].RotateZ(prism_normal_phi_deg[j]* TMath::Pi() / 180);
 	//rotate this for the actual position of this laser stack:
 	prism_normal[i][j].RotateZ(laser_position_angle0+angle_increment*i);
@@ -272,7 +274,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
      float theta_after=asin(arg_asin);//angle we want for the outgoing photon wrt the (forward-facing)normal.
      TVector3 ortho=photon_direction.Cross(prism_normal[L][k]);//the rotation axis perpendicular to the prism and photon normals.
      photon_direction=prism_normal[L][k]; //to get the new direction, start with the normal vector
-     photon_direction.Rotate(-theta_after,ortho);//then rotate about the orthogonal direction the specified amount.
+     photon_direction.Rotate(theta_after,ortho);//then rotate about the orthogonal direction the specified amount.
      //should consider critical angle of total internal reflection, too, just to be thorough...
    }
    if (islost) continue;
