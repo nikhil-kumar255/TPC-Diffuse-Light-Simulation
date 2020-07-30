@@ -5,6 +5,7 @@ TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float leng
 bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_origin, float radius, float zf ); //return true if a photon traverses a cylinder  of radius r between its starting point and zf
 bool HitsIFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 17.25,100.0);};
 bool HitsOFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 80.0,100.0);};
+
 TH2F* LoadLaserProfileFromExponential(const char* profname, float sigma, float length) {
 	double sigma_ideal = sigma;
 	double sigma_y = sigma_ideal;
@@ -53,6 +54,7 @@ void slow_laser_macro_auto() {
   float prismAngle = -5;
   float prismIndex = 1.5;
   float nPrisms = 0;
+
   //set up the diffuser parameters:
   //null angle diffuser returns almost exactly what we take in:
   TF1 *fNullAngle=new TF1("fThorAngle","[0]*exp(-0.5*(x/[1])**2)",-30,30);
@@ -66,8 +68,10 @@ void slow_laser_macro_auto() {
 	//90;//percent.
    //Edmond optics diffuser with a by-hand fit to the model on their page
   ///*
-  TF1* fEdAngle = new TF1("fEdAngle", "([0]**2/((x-[1])**2+[0]**2))", -80, 80);
-  fEdAngle->SetParameters(12, 0);//thorlabs model is 7.5, itterating for edmond 50 deg->12 seems fair
+  TF1* fEdAngle = new TF1("fEdAngle", "([0]+[1]*exp(-(x-[2])**2/(2*[3]**2)))", -80, 80);
+  //TF1* fEdAngle = new TF1("fEdAngle", "([0]**2/((x-[1])**2+[0]**2))", -80, 80);
+  //fEdAngle->SetParameters(12, 0);//thorlabs model is 7.5, itterating for edmond 50 deg->12 seems fair
+  fEdAngle->SetParameters(0.08619476519780576, 0.898522142746825, -0.6797473365855627, 16.17078693739435);//test of gaussian fit to image of 40 deg
   fEdAngle->SetTitle("Edmond optics diffuser angular distribution;angle (deg);arb. prob.");
   float EdTransPercentile = 90;// note 68.35 for 10-220, 57.6 for 10-120, 90 for holographic diffuser from edmond
   //*/
@@ -87,9 +91,9 @@ void slow_laser_macro_auto() {
   ///*
   for (int nDiffusers = 0; nDiffusers < 6; nDiffusers++) {//*/
 	  SimulateLasers(nLasers, laser_tilt_angle, hIntensity, 10.0,
-		  nDiffusers, thorTransPercentile, fThorAngle,
+		  nDiffusers, EdTransPercentile, fEdAngle,
 		  nPrisms, 100, prismIndex, prismAngle,
-		  Form("Prismthor%d", nDiffusers));
+		  Form("TiltEd%d", nDiffusers));
   // comment out the brace below if not running loop oversomething
   }
 
@@ -120,7 +124,8 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   
   TVector3 prism_normal[nLasers][nPrisms*2];
   //define 
-
+  TH1F* PhotonSurvival = new TH1F("PhotonSurvival","Photon Survival at various stages", 100, -0.5, 99.5);
+  int photonstep = 0;
   //rotate each laser to the proper position and update the beam nominal and transverse direction.
   for (int i = 0; i < nLasers; i++)
     {
@@ -212,7 +217,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   int IFCLoss = 0;
   int OFCLoss = 0;
   int DiffuserAbsorbtion[10] = { };
-  int DiffuserScatter[10] = { };
+  int DiffuserGeometric[10] = { };
  /* for (int i = 0; i < nDiffusers; i++) {
 	  DiffuserAbsorbtion[i]=0 ;
 	  DiffuserScatter[i]=0 ;
@@ -282,23 +287,31 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
     xz_dir_pre.SetY(0);
     hPreDiffusionAngle->Fill(xz_dir_pre.Theta()*180/TMath::Pi());
 		
-		
+	bool Geolost = false;
     bool islost = false;
     for (int i = 0; i < nDiffusers; i++) {
-      photon_direction = DiffusePhoton(photon_direction, diffAngleProfile);
-      float rand1 = rand() % 100; //random
+         photon_direction = DiffusePhoton(photon_direction, diffAngleProfile);
+         float rand1 = rand() % 100; //random
       if (rand1 > diffTransmission) { //out of probability range, photon is absorbed}
-	islost = true;
-	DiffuserAbsorbtion[i]++;
-	break; //skip out of this loop
+	      islost = true;
+	      DiffuserAbsorbtion[i]++;
+	      break; //skip out of this loop
       }
+	  if (photon_direction.Theta() * 180 / TMath::Pi() > 90) { 
+	      DiffuserGeometric[i]++;
+	      Geolost = true;
+	      break;
+	  }
     }
-
+	if (Geolost) continue;
+    PhotonSurvival->Fill(photonstep); photonstep++;
     //for now, let's always measure the 1D angular spread as the spread in the XZ plane:  y=0;
     TVector3 xz_dir_post=photon_direction;
+	
     xz_dir_post.SetY(0);
     hPostDiffusionAngle->Fill(xz_dir_post.Theta()*180/TMath::Pi());
 	if (islost) continue;  //skip to the next photon
+	PhotonSurvival->Fill(photonstep); photonstep++;
 
    //end of diffuser
 
@@ -318,6 +331,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
      //should consider critical angle of total internal reflection, too, just to be thorough...
    }
    if (islost) continue;
+   PhotonSurvival->Fill(photonstep); photonstep++;
    //need to consider reflections and other light losses at some point.   
    xz_dir_post=photon_direction;
    hPrismDeflection->Fill(xz_dir_pre.Theta()*180/3.14,xz_dir_post.Theta()*180/3.14);
@@ -327,8 +341,8 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 
 
    //****Collisions Section
-   if (HitsIFC(photon_direction, photon_position)) {IFCLoss++; continue;}
-   if (HitsOFC(photon_direction,photon_position))  {OFCLoss++; continue;}
+   if (HitsIFC(photon_direction, photon_position)) {IFCLoss++; continue;}PhotonSurvival->Fill(photonstep); photonstep++;
+   if (HitsOFC(photon_direction,photon_position))  {OFCLoss++; continue;}PhotonSurvival->Fill(photonstep); photonstep++;
 
    
     //find the position where this photon intersects the CM:
@@ -336,12 +350,13 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
     if (denominator < 0.001) { //parallel to surface.  no solution}
       continue; //skip to the next iteration through the loop
     }
-
+	PhotonSurvival->Fill(photonstep); photonstep++;
 
     TVector3 intersect = (surface_normal.Dot(surface_point - photon_position) / denominator) * photon_direction + photon_position;
 
 
     hPhotonAtSurface->Fill(intersect.X(), intersect.Y());
+	//print values for use in tracepro
 	float print_x_0 = photon_position.x();
 	float print_y_0 = photon_position.y();
 	float print_z_0 = photon_position.z();
@@ -482,7 +497,13 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   for (int i = 0; i < nDiffusers; i++) {
 	  tex = new TLatex(0.0, texpos3, Form("Absorption Loss from Diffuser %d =%d", i+1, DiffuserAbsorbtion[i]));
 	  tex->Draw(); texpos3 -= texshift3; //draw this line and shift our position down to be ready for the next line
+	  tex = new TLatex(0.0, texpos3, Form("Geometric Loss from Diffuser %d =%d", i + 1, DiffuserGeometric[i]));
+	  tex->Draw(); texpos3 -= texshift3; //draw this line and shift our position down to be ready for the next line
   }
+  /*
+  c->cd(9);
+  PhotonSurvival->Draw("hist");
+  //*/
   //
   c->SaveAs(Form("%s.pdf",canvasname));
   fclose(pFile);
