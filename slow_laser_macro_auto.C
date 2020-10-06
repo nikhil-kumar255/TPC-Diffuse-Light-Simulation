@@ -1,11 +1,11 @@
-const TVector3 DrawRandomRayFrom(TH2F* hXY, float d); //draw a ray (angles right, length arbitrary) from a distribution that makes an intensity map hXY a distance d from a source.
+waconst TVector3 DrawRandomRayFrom(TH2F* hXY, float d); //draw a ray (angles right, length arbitrary) from a distribution that makes an intensity map hXY a distance d from a source.
 const TVector3 DiffusePhoton(const TVector3 photon_direction, TF1* angleDist); //modify a vector by two orthogonal random draws from the angle (deg) distribution.
 TH2F* LoadLaserProfileFromFile(const char *profname,const char*tuplefile,const char *tuplename, float length);//build a 2D intensity profile from a file containing a 1D ntuple, and name the resulting profile 'profname'.  The total number of entries span a length of 'length' in cm.
 TH2F* LoadLaserProfileFromFile2(const char* profname, const char* tuplefile, const char* tuplename, float length, float center);//version 2 of the above. monte carlo method
 TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length); //build a 2D intensity profile from a 1D gaussian with sigma 'sigma'cm spanning a length 'length' in cm.
 bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_origin, float radius, float zf ); //return true if a photon traverses a cylinder  of radius r between its starting point and zf
-bool HitsIFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 17.25,100.0);};
-bool HitsOFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 80.0,100.0);};
+bool HitsIFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 21.57,105.2);};// changed from 17.25
+bool HitsOFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 76.42,105.2);};// changed from 80
 
 TH2F* LoadLaserProfileFromExponential(const char* profname, float sigma, float length) {
 	double sigma_ideal = sigma;
@@ -49,13 +49,15 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 void slow_laser_macro_auto() {
 
   const int nLasers = 12;
-  int nDiffusers = 0;
-  float laserthetaparameter=0.1;
-  float laser_tilt_angle = 0;
+  int nDiffusers = 1;
+  float laserthetaparameter=0.1;// only meaningful when not using source file
+  float laser_tilt_angle = 14;
   float prismAngle = 0;
+  //float prismIndex = 1.0;
   float prismIndex = 1.500029;
-  float nPrisms = 1;
-
+  float nPrisms = 0;
+  int DiffuseBounds = 55;// change to 55 for ed50, 80 for ed40
+  float dist=11.0;// distance to profile card
   //set up the diffuser parameters:
   //null angle diffuser returns almost exactly what we take in:
   TF1 *fNullAngle=new TF1("fThorAngle","[0]*exp(-0.5*(x/[1])**2)",-30,30);
@@ -69,14 +71,14 @@ void slow_laser_macro_auto() {
 	//90;//percent.
    //Edmond optics diffuser with a by-hand fit to the model on their page
   ///*
-  TF1* fEdAngle = new TF1("fEdAngle", "([0]+[1]*exp(-(x-[2])**2/(2*[3]**2)))", -55, 55);
-  // 40 degree Edmond Optics Diffuser; Bound -80 to 80
-  //fEdAngle->SetParameters(0, 0.9483733002234809, 0, 16.1331011690544950);//test of gaussian fit to image of 40 deg
+  TF1* fEdAngle = new TF1("fEdAngle", "([0]+[1]*exp(-(x-[2])**2/(2*[3]**2)))", -DiffuseBounds, DiffuseBounds);
+  //***** 40 degree Edmond Optics Diffuser; Bound -80 to 80
+ // fEdAngle->SetParameters(0, 0.9483733002234809, 0, 16.1331011690544950);//test of gaussian fit to image of 40 deg
   // note first parameter A=0.06310490730073468
   // note second parameter H=0.9483733002234809// with A=x_0=0->0.9991798327879257
   // note third parameter x_0=-0.40679912703211746
   // note fourth parameter W=16.1331011690544950// with A=x_0=0->17.41119227449015
-  //  50 Degree Edmond Optics Diffuser; Bound -55 to 55
+  //*****  50 Degree Edmond Optics Diffuser; Bound -55 to 55
   fEdAngle->SetParameters(0, 0.58197, 0, 29.0055);//test of gaussian fit to image of 50 deg
 // note first parameter A=0(by force)
 // note second parameter H=0.58197
@@ -90,27 +92,27 @@ void slow_laser_macro_auto() {
   //hIntensity=LoadLaserProfileFromFile("SculptedTip","ntuple.root","ntuple",14.0);
   hIntensity=LoadLaserProfileFromFile2("CleavedSandedTip","Values_Cleaved_Sanded.root","ntuple",14.0,400);
   //hIntensity=LoadLaserProfileFromFile2("CleavedNotSandedTip","Values_Cleaved_Not_Sanded.root","ntuple",14.0,390);
-  float dist=10.0;//
+  
   //load a gaussian laser profile:
   //hIntensity=LoadLaserProfileFromGaussian("PureGaussianSig1",1,14.0);// sigma 7 is  spread
   //load an exponetial
   //hIntensity = LoadLaserProfileFromExponential("Exponential0.1", 0.1, 14.0);// sigma 7
 
   //now you can make loops that run this multiple times, if you like.  
-  float laser_tilt_angles[] = { 8,17,17.5,18};// for 4 and 5:,19,22     add on s[nDiffusers]
-  // tilt angle repository: { 8,12,16,18} for ed40 both CleavedTips,
-  // ed50:for CleavedNotSandedTip, for CleavedSandedTip
-  float prismAngles[] = {-3.5,-5,-6,-6};//{ 0,-4.5,-6,-8}for ed40 gauss1;
+  float laser_tilt_angles[] = { 8,11,14,18 };// for 4 and 5:,19,22     add on s[nDiffusers]
+  // tilt angle repository: { 8,12,14,18 } for ed40 both CleavedTips,
+  // ed50:for CleavedNotSandedTip, { 9,13,17,18 } for CleavedSandedTip
+  float prismAngles[] = { -3.5,-6,-7,-9 };//{ 0,-4.5,-6,-8}for ed40 gauss1;
   // prism angle repository: {-3,-6,-7,-8} for ed40 CleavedNotSandedTip, {-3.5,-6,-7,-9} for ed40 CleavedSandedTip
   // ed50:for CleavedNotSandedTip, for CleavedSandedTip
-  //*
+  /*
   for (int nDiffusers = 0; nDiffusers < 4; nDiffusers++) {//*/
-	  SimulateLasers(nLasers, laser_tilt_angles[nDiffusers], hIntensity, 10.0,
+	  SimulateLasers(nLasers, laser_tilt_angle, hIntensity,dist,
 		  nDiffusers, EdTransPercentile, fEdAngle,
 		  nPrisms, 100, prismIndex, prismAngle,
-		  Form("CleavedSanded_TiltEd50_%d", nDiffusers));
+		  Form("CleavedSanded11_TiltEd50_%d", nDiffusers));
   // comment out the brace below if not running loop oversomething
-	  //*
+	  /*
   }
 //*/
    return;
@@ -174,7 +176,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 
 
   //define the surface we are illuminating:
-  TVector3 surface_point(0, 0, 100.0);
+  TVector3 surface_point(0, 0, 105.2);// surface is actually 105.2
   TVector3 surface_normal(0, 0, 1);
 
 
@@ -338,28 +340,53 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 	
 
    //end of diffuser
-
+   // initialize apex angle variables 
+	float apex_angle;//something seems very wrong with this. 1+0'
+	float apex_angle_2;//seems more reasonable. 1'-2
+	float theta_zero;
+	float theta_zero_prime;
+	float theta_one;
+	float theta_one_prime;
+	float theta_two;
    //****Prism Section
    //PrePrismSurvival++;
    xz_dir_pre=photon_direction;
+   int prismfacet = 0;
    for (int k=0;k<nPrisms*2;k++){
-     float theta_before=photon_direction.Angle(-prism_normal[L][k]);//angle with respect to the (backward-facing) normal of the kth facet of prism L.
-	 float arg_asin = prism_index[k] / prism_index[k + 1] * sin(theta_before);
+     float theta_before=photon_direction.Angle(prism_normal[L][k]);//angle with respect to the (backward-facing) normal of the kth facet of prism L. 
+	 //******* the negative here(attached to prism normal) is causing errors. I expect it is because it is taking the difference of the actual directions, not the angle used in snell's law(complementary to this).
+	 float arg_asin = prism_index[k] / prism_index[k + 1] * sin(theta_before);//test adding neg to theta before
 	 if (arg_asin >= 1) { //out of probability range, photon is absorbed}
 		 PrismLoss++;
 		 islost = true;
 		 break; //skip out of this loop
 	 }
-     float theta_after=asin(arg_asin);//angle we want for the outgoing photon wrt the (forward-facing)normal.
+     float theta_after=asin(arg_asin);//angle we want for the outgoing photon wrt the (forward-facing)normal. 
+						 //find apex angle
+						 if ( prismfacet == 0) {
+							 theta_zero = theta_before;
+							 theta_zero_prime = theta_after;
+						 }
+						 //
      TVector3 ortho=photon_direction.Cross(prism_normal[L][k]);//the rotation axis perpendicular to the prism and photon normals.
      photon_direction=prism_normal[L][k]; //to get the new direction, start with the normal vector
      photon_direction.Rotate(theta_after,ortho);//then rotate about the orthogonal direction the specified amount.
+						 //2nd apex angle version for comparison
+						 if ( prismfacet == 1) {
+							 theta_one = theta_before;//this is wrong. why? may need to look at photon direction after. big problem was negative in prism normal. still may be negative of correct ans
+						     apex_angle = theta_one + theta_zero_prime;
+							 theta_two = photon_direction.Angle(surface_normal);//test adding negative before photon_direction
+							 theta_one_prime = theta_after;
+							 apex_angle_2 = theta_one_prime - theta_two;
+						 }
+						 //
      //should consider critical angle of total internal reflection, too, just to be thorough...
 	 if (photon_direction.Theta() * 180 / TMath::Pi() > 90) {
 		 islost = true;
 	     PrismLoss++;
 		 break;
 	 }
+	 prismfacet++;
    }
    if (islost) continue;
    PhotonSurvival->Fill(photonstep); photonstep++;
@@ -371,8 +398,8 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
    
    //end of prism
 
-   //*
-   //****Collisions Section
+   //*****Collisions Section
+   
    //PreFieldCageSurvival++;
    if (HitsIFC(photon_direction, photon_position)) {IFCLoss++; continue;}
    PhotonSurvival->Fill(photonstep); photonstep++;
@@ -402,10 +429,14 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 	float print_v_x_0 = photon_direction.x();
 	float print_v_y_0 = photon_direction.y();
 	float print_v_z_0 = photon_direction.z();
-	fprintf(pFile, "%f, %f, %f, %f, %f, %f,1\n", print_x_0, print_y_0, print_z_0, print_v_x_0, print_v_y_0, print_v_z_0);
+	fprintf(pFile, "%f, %f, %f, %f, %f, %f,1,%f,%f,%f,%f,%f,%f,%f\n", print_x_0, print_y_0, print_z_0, print_v_x_0, print_v_y_0, print_v_z_0, apex_angle, apex_angle_2, theta_zero,theta_zero_prime,theta_one,theta_one_prime,theta_two);
 	
   }
-
+  float theta_zero;
+  float theta_zero_prime;
+  float theta_one;
+  float theta_one_prime;
+  float theta_two;
   //hPhotonDirection->Draw("colz");
   //hPhotonAngle->Draw("colz");
   //hPhotonAtSurface->Draw("surf1");
@@ -417,7 +448,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   TH1D* px = new TH1D("px", "Position vs Intensity;Position;Intensity", 201, -100, 100);
   TH1D* pax = new TH1D("pax", "Angle vs Intensity;Angle;Intensity",20, - 30, 30);
   double xI, yI;
-  double zI = 100;//distance of fiber to CM
+  double zI = 105.2;//distance of fiber to CM
   double yPORT = 40; //cm; trial method to create slice histogram 
   double R_out = 80;
 	
@@ -458,7 +489,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
     hPhotonAtSurface->GetBinXYZ(j, binx, biny, binz);//get the per-axis bins for this global bin
     float xpos = hPhotonAtSurface->GetXaxis()->GetBinCenter(binx);
     float ypos = hPhotonAtSurface->GetYaxis()->GetBinCenter(biny);
-    float zpos = 100;
+    float zpos = 105.2;
     float radius = sqrt(xpos * xpos + ypos * ypos);
     float theta = atan2(radius, zpos);
     hIntensityProfile->Fill(content);
@@ -474,16 +505,17 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 
 
   float light_fraction=hPhotonAtSurface->GetEntries()/nPhotons;
-  int bounds[3][2]={{21,26},{45,55},{71,76}};
+  int bounds[3][2]={{25,27},{45,55},{71,75}};
   float diffs[3];
-  for (int j=0;j<3;j++) diffs[j]=bounds[j][1]-bounds[j][0];
+  for (int j=0;j<3;j++) diffs[j]=bounds[j][1]-bounds[j][0]+1;
   //calculate some means from the intensity vs radius (averaging over several bins):
   float central_ave=hIntensityRadius->Integral(bounds[1][0],bounds[1][1])/diffs[1];
   float low_ave=hIntensityRadius->Integral(bounds[0][0],bounds[0][1])/diffs[0];
   float high_ave=hIntensityRadius->Integral(bounds[2][0],bounds[2][1])/diffs[2];
   float ratio_ave=central_ave/low_ave; // how much brighter is central than low?
   float asymmetry=(low_ave-high_ave)/(low_ave+high_ave); //how much brighter is low than high?
-
+  //hIntensity->GetXaxis()->GetBinLowEdge([0][0]);
+  //hIntensity->GetXaxis()->GetBinLowEdge([0][0]);
   TCanvas* c = new TCanvas(canvasname, canvasname, 900, 900);
   c->Divide(3, 3);
   c->cd(1);
@@ -496,9 +528,24 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   hPhotonAtSurface->Draw("colz");
   c->cd(5);
   hIntensityRadius->Draw("hist");
+  float x0, y0, x1, y1; 
+  TLine* line = new TLine(x0, y0, x1, y1); 
+  line->SetLineColor(kRed);
+  //low_ave lines
+  line->DrawLine(hIntensityRadius->GetXaxis()->GetBinLowEdge(bounds[0][0]), 0, hIntensityRadius->GetXaxis()->GetBinLowEdge(bounds[0][0]), hIntensityRadius->GetBinContent(hIntensityRadius->GetMaximumBin()));
+  line->DrawLine(hIntensityRadius->GetXaxis()->GetBinUpEdge(bounds[0][1]), 0, hIntensityRadius->GetXaxis()->GetBinUpEdge(bounds[0][1]), hIntensityRadius->GetBinContent(hIntensityRadius->GetMaximumBin()));
+  //central_ave lines
+  line->SetLineColor(kGreen);
+  line->DrawLine(hIntensityRadius->GetXaxis()->GetBinLowEdge(bounds[1][0]), 0, hIntensityRadius->GetXaxis()->GetBinLowEdge(bounds[1][0]), hIntensityRadius->GetBinContent(hIntensityRadius->GetMaximumBin()));
+  line->DrawLine(hIntensityRadius->GetXaxis()->GetBinUpEdge(bounds[1][1]), 0, hIntensityRadius->GetXaxis()->GetBinUpEdge(bounds[1][1]), hIntensityRadius->GetBinContent(hIntensityRadius->GetMaximumBin()));
+  //High_Ave lines
+  line->SetLineColor(kViolet);
+  line->DrawLine(hIntensityRadius->GetXaxis()->GetBinLowEdge(bounds[2][0]), 0, hIntensityRadius->GetXaxis()->GetBinLowEdge(bounds[2][0]), hIntensityRadius->GetBinContent(hIntensityRadius->GetMaximumBin()));
+  line->DrawLine(hIntensityRadius->GetXaxis()->GetBinUpEdge(bounds[2][1]), 0, hIntensityRadius->GetXaxis()->GetBinUpEdge(bounds[2][1]), hIntensityRadius->GetBinContent(hIntensityRadius->GetMaximumBin()));
   c->cd(6);  
   float texpos=0.9;float texshift=0.08;
   TLatex *tex=new TLatex(0.0,texpos,Form("PhotonSource=%s",hIntensity->GetName()));
+  //
   tex->Draw();texpos-=texshift; //draw this line and shift our position down to be ready for the next line
   tex=new TLatex(0.0,texpos,Form("nDiffs=%d, Trans=%1.1f%%",nDiffusers,diffTransmission));
   tex->Draw();texpos-=texshift; //draw this line and shift our position down to be ready for the next line
