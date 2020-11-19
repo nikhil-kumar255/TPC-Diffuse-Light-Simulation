@@ -1,4 +1,4 @@
-waconst TVector3 DrawRandomRayFrom(TH2F* hXY, float d); //draw a ray (angles right, length arbitrary) from a distribution that makes an intensity map hXY a distance d from a source.
+const TVector3 DrawRandomRayFrom(TH2F* hXY, float d); //draw a ray (angles right, length arbitrary) from a distribution that makes an intensity map hXY a distance d from a source.
 const TVector3 DiffusePhoton(const TVector3 photon_direction, TF1* angleDist); //modify a vector by two orthogonal random draws from the angle (deg) distribution.
 TH2F* LoadLaserProfileFromFile(const char *profname,const char*tuplefile,const char *tuplename, float length);//build a 2D intensity profile from a file containing a 1D ntuple, and name the resulting profile 'profname'.  The total number of entries span a length of 'length' in cm.
 TH2F* LoadLaserProfileFromFile2(const char* profname, const char* tuplefile, const char* tuplename, float length, float center);//version 2 of the above. monte carlo method
@@ -14,7 +14,7 @@ TH2F* LoadLaserProfileFromExponential(const char* profname, float sigma, float l
 
 	int NBins = 100;
 	float Full_Length = length;//cm; length of histogram
-	float Fiber_Scale = Full_Length / NBins; // Length of one bin in cm
+	float Fiber_Scale = Full_Length / NBins; // Length of one bin in cmd
 
 
 	TH2F* hist = new TH2F(Form("h%s", profname), Form("2D Output from %s;x position(cm);y position(cm)", profname), NBins, -Full_Length / 2, Full_Length / 2, NBins, -Full_Length / 2, Full_Length / 2);
@@ -51,12 +51,12 @@ void slow_laser_macro_auto() {
   const int nLasers = 12;
   int nDiffusers = 1;
   float laserthetaparameter=0.1;// only meaningful when not using source file
-  float laser_tilt_angle = 14;
-  float prismAngle = 0;
+  float laser_tilt_angle = 13;
+  float prismAngle = -6;
   //float prismIndex = 1.0;
   float prismIndex = 1.500029;
   float nPrisms = 0;
-  int DiffuseBounds = 55;// change to 55 for ed50, 80 for ed40
+  int DiffuseBounds = 80;// change to 55 for ed50, 80 for ed40
   float dist=11.0;// distance to profile card
   //set up the diffuser parameters:
   //null angle diffuser returns almost exactly what we take in:
@@ -73,13 +73,14 @@ void slow_laser_macro_auto() {
   ///*
   TF1* fEdAngle = new TF1("fEdAngle", "([0]+[1]*exp(-(x-[2])**2/(2*[3]**2)))", -DiffuseBounds, DiffuseBounds);
   //***** 40 degree Edmond Optics Diffuser; Bound -80 to 80
- // fEdAngle->SetParameters(0, 0.9483733002234809, 0, 16.1331011690544950);//test of gaussian fit to image of 40 deg
+  fEdAngle->SetParameters(0, 0.9483733002234809, 0, 16.1331011690544950);//test of gaussian fit to image of 40 deg
   // note first parameter A=0.06310490730073468
   // note second parameter H=0.9483733002234809// with A=x_0=0->0.9991798327879257
   // note third parameter x_0=-0.40679912703211746
   // note fourth parameter W=16.1331011690544950// with A=x_0=0->17.41119227449015
+  // note fourth parameter W=16.1331011690544950// with A=x_0=0->17.41119227449015
   //*****  50 Degree Edmond Optics Diffuser; Bound -55 to 55
-  fEdAngle->SetParameters(0, 0.58197, 0, 29.0055);//test of gaussian fit to image of 50 deg
+  //fEdAngle->SetParameters(0, 0.58197, 0, 29.0055);//test of gaussian fit to image of 50 deg
 // note first parameter A=0(by force)
 // note second parameter H=0.58197
 // note third parameter x_0=3.81880
@@ -110,7 +111,7 @@ void slow_laser_macro_auto() {
 	  SimulateLasers(nLasers, laser_tilt_angle, hIntensity,dist,
 		  nDiffusers, EdTransPercentile, fEdAngle,
 		  nPrisms, 100, prismIndex, prismAngle,
-		  Form("CleavedSanded11_TiltEd50_%d", nDiffusers));
+		  Form("CleavedSanded11_TiltEd40_%d", nDiffusers));
   // comment out the brace below if not running loop oversomething
 	  /*
   }
@@ -218,7 +219,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 
   //when in doubt, google "root [class]" like "root TH2F"
   // TH2F(name, title and axes, number of bins, minimum coordinate, maximum, number of y bins, minimum, maximum)
-  TH2F* hPhotonAtSurface = new TH2F("hPhotonAtSurface", "Photon Position At CM;x(cm);y(cm)",80, -100, 100, 80, -100, 100);
+  TH2F* hPhotonAtSurface = new TH2F("hPhotonAtSurface", "Photon Position At CM;x(cm);y(cm)",160, -100, 100, 160, -100, 100);
   TH2F* hPhotonAngle = new TH2F("hPhotonAngle", "Photon Angle;#theta (x);#phi (y)", 50, 0, 2, 50, 0, 6.5);
   TH1F* hPreDiffusionAngle = new TH1F("hPreDiffusionAngle", "Photon Y Angle Before Diffusion;#theta (deg)", 50, -45, 45);
   TH1F* hPostDiffusionAngle = new TH1F("hPostDiffusionAngle", "Photon Y Angle After Diffusion;#theta (deg)", 50, -45, 45);
@@ -231,7 +232,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   char name[100];
   pFile = fopen("test_trace.csv", "w");
   //*//
-  int nPhotons = 1000000;
+  int nPhotons = 50000000;
   //****Begin Loss Parameters
   //int PreFieldCageSurvival = 1;
   int IFCLoss = 0;
@@ -472,21 +473,22 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   //hPhotonAtSurface->Draw("colz");
   //*/
   //*****************************
-
+  int Radius_resolution = 200;
+  int Radius_Boundary = 100;//start at zero, end here
   //Draw a lot of useful histograms:
   int nCells = hPhotonAtSurface->GetNcells();//total number of bins in histogram
   TH1F* hIntensityProfile = new TH1F("hIntensityProfile", "Histogram of Intensity per bin;intensity;nbins", 100, 1, 5 * nPhotons / nCells);
-  TH1F* hIntensityRadius = new TH1F("hIntensityRadius", "Mean Intensity vs Radius;radius;mean intensity", 100, 0, 100);
+  TH1F* hIntensityRadius = new TH1F("hIntensityRadius", "Mean Intensity vs Radius;radius;mean intensity", Radius_resolution, 0, Radius_Boundary);
   TH1F* hIntensityTheta = new TH1F("hIntensityTheta", "Mean Intensity vs Angle;Theta;mean intensity", 50, - (1 / 2) * TMath::Pi(), (1 / 2) * TMath::Pi());
   TH2F *hRadiusProfile=new TH2F("hRadiusProfile","Histogram of Intensity vs Radius for all bins, radius,intensity",100,0,100,100,1,5*nPhotons/nCells);
-  TH1F* hRadius = new TH1F("hRadius", "nbins vs radius, for normalization;radius;nbins", 100, 0, 100);
+  TH1F* hRadius = new TH1F("hRadius", "nbins vs radius, for normalization;radius;nbins", Radius_resolution, 0, Radius_Boundary);
   TH1F* hTheta = new TH1F("hTheta", "nbins vs Angle(Theta), for normalization;Theta;nbins", 50, 0, (1/2)*TMath::Pi());
 
   //read the bins from photonAtSurface and histogram their contents to get the per-radius average intensities
   for (int j = 0; j < nCells; j++) {
     float content = hPhotonAtSurface->GetBinContent(j);
     int binx, biny, binz;
-    hPhotonAtSurface->GetBinXYZ(j, binx, biny, binz);//get the per-axis bins for this global bin
+    hPhotonAtSurface->GetBinXYZ(j, binx, biny, binz);//get the per-axis bins(bin number, not position) for this global bin
     float xpos = hPhotonAtSurface->GetXaxis()->GetBinCenter(binx);
     float ypos = hPhotonAtSurface->GetYaxis()->GetBinCenter(biny);
     float zpos = 105.2;
@@ -503,9 +505,9 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   hIntensityRadius->Divide(hRadius);
   hIntensityTheta->Divide(hTheta);
 
-
+  int Bs= Radius_resolution/Radius_Boundary;
   float light_fraction=hPhotonAtSurface->GetEntries()/nPhotons;
-  int bounds[3][2]={{25,27},{45,55},{71,75}};
+  int bounds[3][2]={{25*Bs,27 * Bs},{45 * Bs,55 * Bs},{71 * Bs,75 * Bs}};
   float diffs[3];
   for (int j=0;j<3;j++) diffs[j]=bounds[j][1]-bounds[j][0]+1;
   //calculate some means from the intensity vs radius (averaging over several bins):
@@ -528,6 +530,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   hPhotonAtSurface->Draw("colz");
   c->cd(5);
   hIntensityRadius->Draw("hist");
+  hIntensityRadius->SaveAs("hIntensityRadius.hist.root");
   float x0, y0, x1, y1; 
   TLine* line = new TLine(x0, y0, x1, y1); 
   line->SetLineColor(kRed);
