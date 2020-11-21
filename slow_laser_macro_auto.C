@@ -40,22 +40,22 @@ TH2F* LoadLaserProfileFromExponential(const char* profname, float sigma, float l
 //                       then run it through n prisms, with a defined transmission, index of refraction, and wedge angle.
 //this will produce a new canvas called 'canvasname' (and we can rig it to save that canvas, too, by adding a line at the end).
 //todo:  could also have it return an array of useful parameters if you want.
-void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float dist,
+std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float dist,
 		      int nDiffusers,float diffTransmission, TF1 *diffAngleProfile,
 		    int nPrisms, float prismTransmission, float prismIndex, float prismAngle,
 		    const char* canvasname);
 
-
+//struct Maxima{ int light_frac; int ratio_ave; };
 void slow_laser_macro_auto() {
 
   const int nLasers = 12;
   int nDiffusers = 1;
   float laserthetaparameter=0.1;// only meaningful when not using source file
-  float laser_tilt_angle = 13;
-  float prismAngle = -6;
+  float laser_tilt_angle = 0;
+  float prismAngle = 0;
   //float prismIndex = 1.0;
   float prismIndex = 1.500029;
-  float nPrisms = 0;
+  float nPrisms = 1;
   int DiffuseBounds = 80;// change to 55 for ed50, 80 for ed40
   float dist=11.0;// distance to profile card
   //set up the diffuser parameters:
@@ -103,23 +103,44 @@ void slow_laser_macro_auto() {
   float laser_tilt_angles[] = { 8,11,14,18 };// for 4 and 5:,19,22     add on s[nDiffusers]
   // tilt angle repository: { 8,12,14,18 } for ed40 both CleavedTips,
   // ed50:for CleavedNotSandedTip, { 9,13,17,18 } for CleavedSandedTip
-  float prismAngles[] = { -3.5,-6,-7,-9 };//{ 0,-4.5,-6,-8}for ed40 gauss1;
+  float prismAngles[] = {-3.5,-6,-7,-9};//{ 0,-4.5,-6,-8}for ed40 gauss1;
   // prism angle repository: {-3,-6,-7,-8} for ed40 CleavedNotSandedTip, {-3.5,-6,-7,-9} for ed40 CleavedSandedTip
   // ed50:for CleavedNotSandedTip, for CleavedSandedTip
-  /*
-  for (int nDiffusers = 0; nDiffusers < 4; nDiffusers++) {//*/
-	  SimulateLasers(nLasers, laser_tilt_angle, hIntensity,dist,
+  //*
+  
+std::vector<float> Light_Frac;
+std::vector<float> vecI;
+std::vector<float> Ave_Ratio;
+  for (int prismAngle_itt = -20; prismAngle_itt < 20; prismAngle_itt++) {//*/
+	 vecI=SimulateLasers(nLasers, laser_tilt_angle, hIntensity,dist,
 		  nDiffusers, EdTransPercentile, fEdAngle,
-		  nPrisms, 100, prismIndex, prismAngle,
-		  Form("CleavedSanded11_TiltEd40_%d", nDiffusers));
+		  nPrisms, 100, prismIndex, -prismAngle_itt,
+		  Form("CleavedSanded11_TiltEd40_Angle%d", -prismAngle_itt));
   // comment out the brace below if not running loop oversomething
-	  /*
-  }
+	  //*/
+	 printf("ratio, yield=%f,%f\n", vecI[1],vecI[0]);
+	  Light_Frac.push_back(vecI[1]*100);
+	  Ave_Ratio.push_back(vecI[0]);
+  
+ 
+
+  }//*
+  TCanvas *c1 = new TCanvas("c1","A Simple Graph Example",200,10,500,300);
+  TGraph* g = new TGraph(Light_Frac.size(), &(Ave_Ratio[0]), &(Light_Frac[0]));
+  g->SetTitle("Yield vs uniformity;Center to Inner Ratio;Yield");
+  g->Draw("AC*");
+  /*TLine line;
+  c1->cd(1);
+  line.DrawLine(400, 0, 400, 250);
+  c1->cd(2);
+  line.DrawLine(0, 0, 0, 250);*///*/
 //*/
+
+
    return;
 };
 
-void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float dist,
+std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float dist,
 		      int nDiffusers,float diffTransmission, TF1 *diffAngleProfile,
 		    int nPrisms, float prismTransmission, float prismIndex, float prismAngle,
 		    const char* canvasname){   
@@ -219,7 +240,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
 
   //when in doubt, google "root [class]" like "root TH2F"
   // TH2F(name, title and axes, number of bins, minimum coordinate, maximum, number of y bins, minimum, maximum)
-  TH2F* hPhotonAtSurface = new TH2F("hPhotonAtSurface", "Photon Position At CM;x(cm);y(cm)",160, -100, 100, 160, -100, 100);
+  TH2F* hPhotonAtSurface = new TH2F("hPhotonAtSurface", "Photon Position At CM;x(cm);y(cm)",80, -100, 100, 80, -100, 100);
   TH2F* hPhotonAngle = new TH2F("hPhotonAngle", "Photon Angle;#theta (x);#phi (y)", 50, 0, 2, 50, 0, 6.5);
   TH1F* hPreDiffusionAngle = new TH1F("hPreDiffusionAngle", "Photon Y Angle Before Diffusion;#theta (deg)", 50, -45, 45);
   TH1F* hPostDiffusionAngle = new TH1F("hPostDiffusionAngle", "Photon Y Angle After Diffusion;#theta (deg)", 50, -45, 45);
@@ -232,7 +253,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   char name[100];
   pFile = fopen("test_trace.csv", "w");
   //*//
-  int nPhotons = 50000000;
+  int nPhotons = 1000000;
   //****Begin Loss Parameters
   //int PreFieldCageSurvival = 1;
   int IFCLoss = 0;
@@ -473,7 +494,7 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   //hPhotonAtSurface->Draw("colz");
   //*/
   //*****************************
-  int Radius_resolution = 200;
+  int Radius_resolution = 100;
   int Radius_Boundary = 100;//start at zero, end here
   //Draw a lot of useful histograms:
   int nCells = hPhotonAtSurface->GetNcells();//total number of bins in histogram
@@ -612,7 +633,10 @@ void SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hIntensity, float 
   //
   c->SaveAs(Form("%s.pdf",canvasname));
   fclose(pFile);
-  return;
+  std::vector<float> vecD;
+  vecD.push_back(ratio_ave);
+  vecD.push_back(light_fraction);
+  return vecD;
     }
 
 
