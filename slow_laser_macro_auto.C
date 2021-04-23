@@ -111,6 +111,7 @@ void slow_laser_macro_auto() {
 std::vector<float> Light_Frac;
 std::vector<float> vecI;
 std::vector<float> Ave_Ratio;
+std::vector<float> Prism_Angle;
   for (int prismAngle_itt = -20; prismAngle_itt < 20; prismAngle_itt++) {//*/
 	 vecI=SimulateLasers(nLasers, laser_tilt_angle, hIntensity,dist,
 		  nDiffusers, EdTransPercentile, fEdAngle,
@@ -121,11 +122,12 @@ std::vector<float> Ave_Ratio;
 	 printf("ratio, yield=%f,%f\n", vecI[1],vecI[0]);
 	  Light_Frac.push_back(vecI[1]*100);
 	  Ave_Ratio.push_back(vecI[0]);
+	  Prism_angle.push_back(prismAngle_itt);
   
  
 
   }//*
-  TCanvas *c1 = new TCanvas("c1","A Simple Graph Example",200,10,500,300);
+  TCanvas *c1 = new TCanvas("c1","A Simple Graph Example",200,10,500,300);//
   TGraph* g = new TGraph(Light_Frac.size(), &(Ave_Ratio[0]), &(Light_Frac[0]));
   g->SetTitle("Yield vs uniformity;Center to Inner Ratio;Yield");
   g->Draw("AC*");
