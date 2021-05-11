@@ -2,7 +2,7 @@ const TVector3 DrawRandomRayFrom(TH2F* hXY, float d); //draw a ray (angles right
 const TVector3 DiffusePhoton(const TVector3 photon_direction, TF1* angleDist); //modify a vector by two orthogonal random draws from the angle (deg) distribution.
 TH2F* LoadLaserProfileFromFile(const char *profname,const char*tuplefile,const char *tuplename, float length);//build a 2D intensity profile from a file containing a 1D ntuple, and name the resulting profile 'profname'.  The total number of entries span a length of 'length' in cm.
 TH2F* LoadLaserProfileFromFile2(const char* profname, const char* tuplefile, const char* tuplename, float length, float center);//version 2 of the above. monte carlo method
-TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length); //build a 2D intensity profile from a 1D gaussian with sigma 'sigma'cm spanning a length 'length' in cm.
+TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length, float power=1.0); //build a 2D intensity profile from a 1D gaussian with sigma 'sigma'cm spanning a length 'length' in cm.
 bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_origin, float radius, float zf ); //return true if a photon traverses a cylinder  of radius r between its starting point and zf
 bool HitsIFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 21.57,105.2);};// changed from 17.25
 bool HitsOFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 76.42,105.2);};// changed from 80
@@ -48,16 +48,16 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
 //struct Maxima{ int light_frac; int ratio_ave; };
 void slow_laser_macro_auto() {
 
-  const int nLasers = 12;
+  const int nLasers = 1;
   int nDiffusers = 1;
   float laserthetaparameter=0.1;// only meaningful when not using source file
-  float laser_tilt_angle = 0;
+  float laser_tilt_angle = 10;
   float prismAngle = 0;
   //float prismIndex = 1.0;
   float prismIndex = 1.500029;
-  float nPrisms = 1;
+  float nPrisms = 0;
   int DiffuseBounds = 80;// change to 55 for ed50, 80 for ed40
-  float dist=11.0;// distance to profile card
+  float dist=34.5;// distance to profile card was 11 for bob; Ross's measurement 5/3 is 35-.5cm=34.5 cm
   //set up the diffuser parameters:
   //null angle diffuser returns almost exactly what we take in:
   TF1 *fNullAngle=new TF1("fThorAngle","[0]*exp(-0.5*(x/[1])**2)",-30,30);
@@ -91,11 +91,11 @@ void slow_laser_macro_auto() {
   TH2F* hIntensity;
   //load Bob's sculpted-tip laser profile from file(stored in root/Bin):
   //hIntensity=LoadLaserProfileFromFile("SculptedTip","ntuple.root","ntuple",14.0);
-  hIntensity=LoadLaserProfileFromFile2("CleavedSandedTip","Values_Cleaved_Sanded.root","ntuple",14.0,400);
+  //hIntensity=LoadLaserProfileFromFile2("CleavedSandedTip","Values_Cleaved_Sanded.root","ntuple",14.0,400);
   //hIntensity=LoadLaserProfileFromFile2("CleavedNotSandedTip","Values_Cleaved_Not_Sanded.root","ntuple",14.0,390);
-  
+  float fsigma = .97;
   //load a gaussian laser profile:
-  //hIntensity=LoadLaserProfileFromGaussian("PureGaussianSig1",1,14.0);// sigma 7 is  spread
+  hIntensity=LoadLaserProfileFromGaussian("PureGaussianSig1", fsigma,28.0,2.31);// sigma 7 is  spread, length is 14 to match bobs fibers. 
   //load an exponetial
   //hIntensity = LoadLaserProfileFromExponential("Exponential0.1", 0.1, 14.0);// sigma 7
 
@@ -112,25 +112,26 @@ std::vector<float> Light_Frac;
 std::vector<float> vecI;
 std::vector<float> Ave_Ratio;
 std::vector<float> Prism_Angle;
-  for (int prismAngle_itt = -20; prismAngle_itt < 20; prismAngle_itt++) {//*/
-	 vecI=SimulateLasers(nLasers, laser_tilt_angle, hIntensity,dist,
+  //for (int prismAngle_itt = -20; prismAngle_itt < 20; prismAngle_itt++) {//*/
+for (int laser_tilt_angle_itt = 0; laser_tilt_angle_itt < 2; laser_tilt_angle_itt++) {//*/
+	 vecI=SimulateLasers(nLasers, laser_tilt_angle_itt, hIntensity,dist,
 		  nDiffusers, EdTransPercentile, fEdAngle,
-		  nPrisms, 100, prismIndex, -prismAngle_itt,
-		  Form("CleavedSanded11_TiltEd40_Angle%d", -prismAngle_itt));
+		  nPrisms, 100, prismIndex, 0,
+		  Form("5-3_fiber_sigma-%2.1f_TiltedFiber_Ed40Diffuser_Angle%d", fsigma,laser_tilt_angle_itt));
   // comment out the brace below if not running loop oversomething
 	  //*/
-	 printf("ratio, yield=%f,%f\n", vecI[1],vecI[0]);
-	  Light_Frac.push_back(vecI[1]*100);
-	  Ave_Ratio.push_back(vecI[0]);
-	  Prism_angle.push_back(prismAngle_itt);
-  
+	 //printf("ratio, yield=%f,%f\n", vecI[1],vecI[0]);
+	 // Light_Frac.push_back(vecI[1]*100);
+	 // Ave_Ratio.push_back(vecI[0]);
+	 // Prism_angle.push_back(prismAngle_itt);
+  //
  
 
   }//*
-  TCanvas *c1 = new TCanvas("c1","A Simple Graph Example",200,10,500,300);//
-  TGraph* g = new TGraph(Light_Frac.size(), &(Ave_Ratio[0]), &(Light_Frac[0]));
-  g->SetTitle("Yield vs uniformity;Center to Inner Ratio;Yield");
-  g->Draw("AC*");
+  //TCanvas *c1 = new TCanvas("c1","A Simple Graph Example",200,10,500,300);//
+  //TGraph* g = new TGraph(Light_Frac.size(), &(Ave_Ratio[0]), &(Light_Frac[0]));
+  //g->SetTitle("Yield vs uniformity;Center to Inner Ratio;Yield");
+  //g->Draw("AC*");
   /*TLine line;
   c1->cd(1);
   line.DrawLine(400, 0, 400, 250);
@@ -334,6 +335,7 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
 		
 	bool Geolost = false;
     bool islost = false;
+	
     for (int j = 0; j < nDiffusers; j++) {
          photon_direction = DiffusePhoton(photon_direction, diffAngleProfile);
          float rand1 = rand() % 100; //random
@@ -553,7 +555,7 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   hPhotonAtSurface->Draw("colz");
   c->cd(5);
   hIntensityRadius->Draw("hist");
-  hIntensityRadius->SaveAs("hIntensityRadius.hist.root");
+  hIntensityRadius->SaveAs(Form("hIntensityRadius.%s.hist.root",canvasname));
   float x0, y0, x1, y1; 
   TLine* line = new TLine(x0, y0, x1, y1); 
   line->SetLineColor(kRed);
@@ -767,7 +769,7 @@ TH2F* LoadLaserProfileFromFile2(const char* profname, const char* tuplefile, con
 }
 //*/
 
-TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length){
+TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length, float power){
   double sigma_ideal = sigma;
   double sigma_y = sigma_ideal;
   double sigma_x = sigma_ideal;
@@ -784,7 +786,7 @@ TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float leng
     float x_i = (-Full_Length / 2) + (i+0.5) * Fiber_Scale;
     for (int j = 0; j < NBins; j++) {
       float y_i = (-Full_Length / 2) + (j+0.5) * Fiber_Scale;
-      hist->Fill(x_i, y_i, exp(-2 * ((x_i * x_i) / (sigma_x * sigma_x) + (y_i * y_i) / (sigma_y * sigma_y))));
+      hist->Fill(x_i, y_i, exp(-(0.5) * pow(((x_i * x_i) / (sigma_x * sigma_x) + (y_i * y_i) / (sigma_y * sigma_y)), power) ));
     }
   }
   return hist;
