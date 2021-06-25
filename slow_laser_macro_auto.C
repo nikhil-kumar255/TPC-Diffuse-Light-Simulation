@@ -48,7 +48,7 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
 //struct Maxima{ int light_frac; int ratio_ave; };
 void slow_laser_macro_auto() {
 
-  const int nLasers = 1;
+  const int nLasers = 12;
   int nDiffusers = 1;
   float laserthetaparameter=0.1;// only meaningful when not using source file
   float laser_tilt_angle = 10;
@@ -90,12 +90,12 @@ void slow_laser_macro_auto() {
   //*/
   TH2F* hIntensity;
   //load Bob's sculpted-tip laser profile from file(stored in root/Bin):
-  //hIntensity=LoadLaserProfileFromFile("SculptedTip","ntuple.root","ntuple",14.0);
+  hIntensity=LoadLaserProfileFromFile("SculptedTip","ntuple.root","ntuple",14.0);
   //hIntensity=LoadLaserProfileFromFile2("CleavedSandedTip","Values_Cleaved_Sanded.root","ntuple",14.0,400);
   //hIntensity=LoadLaserProfileFromFile2("CleavedNotSandedTip","Values_Cleaved_Not_Sanded.root","ntuple",14.0,390);
   float fsigma = .97;
   //load a gaussian laser profile:
-  hIntensity=LoadLaserProfileFromGaussian("PureGaussianSig1", fsigma,28.0,2.31);// sigma 7 is  spread, length is 14 to match bobs fibers. 
+  //hIntensity=LoadLaserProfileFromGaussian("PureGaussianSig1", fsigma,28.0,2.31);// sigma 7 is  spread, length is 14 to match bobs fibers. 
   //load an exponetial
   //hIntensity = LoadLaserProfileFromExponential("Exponential0.1", 0.1, 14.0);// sigma 7
 
@@ -107,36 +107,90 @@ void slow_laser_macro_auto() {
   // prism angle repository: {-3,-6,-7,-8} for ed40 CleavedNotSandedTip, {-3.5,-6,-7,-9} for ed40 CleavedSandedTip
   // ed50:for CleavedNotSandedTip, for CleavedSandedTip
   //*
-  
+  time_t rawtime;
+  struct tm* timeinfo;
+  char Time[80];// time string with size given
+  time(&rawtime);
+  timeinfo = localtime(&rawtime);
+  strftime(Time, 80, "%Y-%m-%d-%H:%M:%S", timeinfo);
+  puts(Time);//print Time to root 
+  //TFile* MyFile = new TFile(Form("QE_%s.root", Time), "New");
 std::vector<float> Light_Frac;
 std::vector<float> vecI;
 std::vector<float> Ave_Ratio;
-std::vector<float> Prism_Angle;
+std::vector<float> IO_asymm;
+std::vector<float> AngLe;
+std::vector<float> Outer_Ave_Ratio;
+//std::vector<float> Prism_Angle;
   //for (int prismAngle_itt = -20; prismAngle_itt < 20; prismAngle_itt++) {//*/
-for (int laser_tilt_angle_itt = 0; laser_tilt_angle_itt < 2; laser_tilt_angle_itt++) {//*/
+for (int laser_tilt_angle_itt = 10; laser_tilt_angle_itt < 11; laser_tilt_angle_itt++) {//*/
 	 vecI=SimulateLasers(nLasers, laser_tilt_angle_itt, hIntensity,dist,
 		  nDiffusers, EdTransPercentile, fEdAngle,
 		  nPrisms, 100, prismIndex, 0,
-		  Form("5-3_fiber_sigma-%2.1f_TiltedFiber_Ed40Diffuser_Angle%d", fsigma,laser_tilt_angle_itt));
-  // comment out the brace below if not running loop oversomething
-	  //*/
-	 //printf("ratio, yield=%f,%f\n", vecI[1],vecI[0]);
-	 // Light_Frac.push_back(vecI[1]*100);
-	 // Ave_Ratio.push_back(vecI[0]);
-	 // Prism_angle.push_back(prismAngle_itt);
+		  Form("5-3_fiber_SculptedTip_deviation_0-5_TiltedFiber_Ed40Diffuser_Angle%d_%s", laser_tilt_angle_itt,Time));
+  // comment out the brace below if not running loop oversomething;Form("5-3_fiber_sigma-%2.1f_TiltedFiber_Ed40Diffuser_Angle%d", fsigma,laser_tilt_angle_itt));
+	  /////*//
+	 /*printf("ratio, yield=%f,%f\n", vecI[1],vecI[0]);*/
+	  Light_Frac.push_back(vecI[1]*100);
+	  Ave_Ratio.push_back(vecI[0]);
+	  IO_asymm.push_back(vecI[2]);
+	  AngLe.push_back(laser_tilt_angle_itt);
+	  Outer_Ave_Ratio.push_back(vecI[3]);
+	  //Prism_angle.push_back(prismAngle_itt);
   //
  
 
-  }//*
-  //TCanvas *c1 = new TCanvas("c1","A Simple Graph Example",200,10,500,300);//
-  //TGraph* g = new TGraph(Light_Frac.size(), &(Ave_Ratio[0]), &(Light_Frac[0]));
-  //g->SetTitle("Yield vs uniformity;Center to Inner Ratio;Yield");
-  //g->Draw("AC*");
-  /*TLine line;
-  c1->cd(1);
-  line.DrawLine(400, 0, 400, 250);
-  c1->cd(2);
-  line.DrawLine(0, 0, 0, 250);*///*/
+  }
+///*
+TCanvas* c1 = new TCanvas("c1", "A Simple Graph Example", 1000, 400);
+c1->Divide(3, 1);
+c1->cd(1);
+TGraph* gone = new TGraph(Light_Frac.size(), &(AngLe[0]), &(Light_Frac[0]));
+gone->SetTitle("Yield vs Angle;Degrees;Yield");
+gone->Draw("AC*");
+/*c1->cd(2);
+TGraph* gtwo = new TGraph(Light_Frac.size(), &(AngLe[0]), &(Ave_Ratio[0]));
+gtwo->SetTitle("Uniformity vs Angle;Degrees;Center to Inner Ratio");
+gtwo->Draw("AC*");*/
+c1->cd(2);
+TMultiGraph* gmultitwo = new TMultiGraph("gmultitwo","gmultitwo");
+gmultitwo->SetTitle("Uniformity vs Angle;Degrees;Center to x Ratio");
+
+TGraph* gr2 = new TGraph(Light_Frac.size(), &(AngLe[0]), &(Ave_Ratio[0]));
+gr2->SetName("gr2");
+gr2->SetTitle("central/inner ratio");
+//gr2->SetMarkerStyle(22);
+//gr2->SetMarkerColor(2);
+//gr2->SetDrawOption("P");
+gr2->SetLineColor(3);
+gr2->SetLineWidth(3);
+//gr2->SetFillStyle(0);
+TGraph* gr3 = new TGraph(Light_Frac.size(), &(AngLe[0]), &(Outer_Ave_Ratio[0]));
+gr3->SetName("gr3");
+gr3->SetTitle("central/outer Ratio");
+//gr3->SetMarkerStyle(23);
+gr3->SetLineColor(4);
+gr3->SetLineWidth(3);
+//gr3->SetFillStyle(0);
+gmultitwo->Add(gr2);
+gmultitwo->Add(gr3);
+gr3->Draw("AC*");
+gmultitwo->Draw("AC*");
+gPad->BuildLegend();
+
+c1->cd(3);
+TGraph* gthree = new TGraph(Light_Frac.size(), &(AngLe[0]), &(IO_asymm[0]));
+gthree->SetTitle("Asymmetry vs Angle;Angle(deg);Inner-Outer Asymmetry(diff/sum)");
+gthree->Draw("AC*");
+//c1->cd(4);
+//TGraph* gfour = new TGraph(Light_Frac.size(), &(Ave_Ratio[0]), &(IO_asymm[0]));
+//gthree->SetTitle("Asymmetry vs Uniformity;Center to Inner Ratio;Inner-Outer Asymmetry(diff/sum)");
+//gthree->Draw("AC*");
+  //*TLine line;
+  //c1->cd(1);
+  //line.DrawLine(400, 0, 400, 250);
+  //c1->cd(2);
+  //line.DrawLine(0, 0, 0, 250);*///*/
 //*/
 
 
@@ -154,9 +208,8 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   //define the position of the lasers:
   TVector3 laser_position[nLasers];
   float laser_position_angle0 = 0;
-
   float angle_increment = 2 * TMath::Pi() / nLasers; // assume they're equally spaced
-
+  
   //define the parameters of the laser stack:
   float laser_tilt = laser_tilt_angle * TMath::Pi() / 180; //and have a common tilt, leaning outward in the rz plane.
   //nPrisms=1; //hard-wired for now.
@@ -164,12 +217,13 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   float prism_normal_phi_deg[]={0,0}; //one for each facet positive=image rotated CW on the CM
   float prism_index[]={1.0,prismIndex,1.0};//one for each region separated by a facet
 
-  
   TVector3 prism_normal[nLasers][nPrisms*2];
   //define 
   //
   TH1F* PhotonSurvival = new TH1F("PhotonSurvival","Photon Survival at various stages", 16, -0.5, 15.5);
-  
+  //laser deviation
+  float Laser_deviation = 10.0*TMath::Pi() / 180.0;//pi/360 is half degree deviation
+  int nlaser_deviated = 0;
   //rotate each laser to the proper position and update the beam nominal and transverse direction.
   for (int i = 0; i < nLasers; i++)
     {
@@ -177,15 +231,20 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
       //printf("%f\n",laser_nominal[i].X());
       //laser_nominal[i].SetXYZ(0, 0, 1);
       laser_transverse[i].SetXYZ(1, 0, 0);
-      laser_position[i].SetXYZ(0.0, 40.0, 0);
+      laser_position[i].SetXYZ(0.0, 40.0, 0);//defined as 16.026 in=>40.706 cm
       //rotate the basis vectors of the laser:
       //laser_nominal[i].RotateX(laser_tilt);
       //laser_transverse[i].RotateX(laser_tilt);
       //printf("%f\n", laser_nominal[i].X());
       laser_nominal[i].RotateZ(laser_position_angle0 + angle_increment * i);
       laser_transverse[i].RotateZ(laser_position_angle0 + angle_increment * i);
-      //rotate the position of the laser:
+      //rotate the position of the laser: //determine sensitivity of laser position
       laser_position[i].RotateZ(laser_position_angle0 + angle_increment * i);
+	  //*
+	  if (i == nlaser_deviated)
+		  //laser_position[i].RotateZ(Laser_deviation);
+		  laser_nominal[i].RotateZ(Laser_deviation);//*/
+	 
 
       for (int j=0;j<nPrisms*2;j++){
 	//set up the nominal orientation if this were at (x=0,y>0):
@@ -242,8 +301,11 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   //conceptually, point backward from the intersection point in the negative laser direction until we hit the plane defined by the laser direction and the laser position. This tells us the 
 
   //when in doubt, google "root [class]" like "root TH2F"
+  int histogram_bin_number = 1 * 40;
   // TH2F(name, title and axes, number of bins, minimum coordinate, maximum, number of y bins, minimum, maximum)
-  TH2F* hPhotonAtSurface = new TH2F("hPhotonAtSurface", "Photon Position At CM;x(cm);y(cm)",80, -100, 100, 80, -100, 100);
+  TH2F* hPhotonAtSurface = new TH2F("hPhotonAtSurface", "Photon Position At CM;x(cm);y(cm)", histogram_bin_number, -100, 100, histogram_bin_number, -100, 100);
+  TH2F* hPhotonAtSurface_negate = new TH2F("hPhotonAtSurface_negate", "Photon Position At CM negated;-x(cm);-y(cm)", histogram_bin_number, -100, 100, histogram_bin_number, -100, 100);
+  TH2F* hPhotonAtSurface_normal_to_negate_ratio = new TH2F("hPhotonAtSurface_ratio", "Photon Position At CM Ratio;x(ratio);y(ratio)", histogram_bin_number, -100, 100, histogram_bin_number, -100, 100);
   TH2F* hPhotonAngle = new TH2F("hPhotonAngle", "Photon Angle;#theta (x);#phi (y)", 50, 0, 2, 50, 0, 6.5);
   TH1F* hPreDiffusionAngle = new TH1F("hPreDiffusionAngle", "Photon Y Angle Before Diffusion;#theta (deg)", 50, -45, 45);
   TH1F* hPostDiffusionAngle = new TH1F("hPostDiffusionAngle", "Photon Y Angle After Diffusion;#theta (deg)", 50, -45, 45);
@@ -256,7 +318,7 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   char name[100];
   pFile = fopen("test_trace.csv", "w");
   //*//
-  int nPhotons = 1000000;
+  int nPhotons = 1*1000000;
   //****Begin Loss Parameters
   //int PreFieldCageSurvival = 1;
   int IFCLoss = 0;
@@ -446,9 +508,11 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
 
     TVector3 intersect = (surface_normal.Dot(surface_point - photon_position) / denominator) * photon_direction + photon_position;
 
+	//print values for use in tracepro
 
     hPhotonAtSurface->Fill(intersect.X(), intersect.Y());
-	//print values for use in tracepro
+	hPhotonAtSurface_negate->Fill(-intersect.X(), -intersect.Y());
+	
 	float print_x_0 = photon_position.x();
 	float print_y_0 = photon_position.y();
 	float print_z_0 = photon_position.z();
@@ -458,6 +522,24 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
 	fprintf(pFile, "%f, %f, %f, %f, %f, %f,1,%f,%f,%f,%f,%f,%f,%f\n", print_x_0, print_y_0, print_z_0, print_v_x_0, print_v_y_0, print_v_z_0, apex_angle, apex_angle_2, theta_zero,theta_zero_prime,theta_one,theta_one_prime,theta_two);
 	
   }
+
+  // negate outer and inner part filled bins. search partfillbin
+
+  //float partfillbinx = intersect.X() * intersect.X();
+  //double partfillbiny = intersect.Y() * intersect.Y();
+  //double partfillbin = partfillbinx + partfillbiny;
+
+ // //*
+ // if (partfillbin>outer_bin_rad){
+	//  continue;
+	//}//*///
+	////*
+	//if (partfillbin < inner_bin_rad) {
+	//continue;
+	//}//*///
+
+
+
   float theta_zero;
   float theta_zero_prime;
   float theta_one;
@@ -490,7 +572,8 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   //double PhiI = atan2(yI, xI);
   //px->Draw("hist");
   //*///**********
-
+  float outer_bin_rad = 72 * 72;
+  float inner_bin_rad = 25 * 25;
 
   //*****************************
   //Draw photons striking cm with all given previous conditions
@@ -516,6 +599,10 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
     hPhotonAtSurface->GetBinXYZ(j, binx, biny, binz);//get the per-axis bins(bin number, not position) for this global bin
     float xpos = hPhotonAtSurface->GetXaxis()->GetBinCenter(binx);
     float ypos = hPhotonAtSurface->GetYaxis()->GetBinCenter(biny);
+	//float partfillbin = xpos * xpos + ypos * ypos;
+	//if (partfillbin > outer_bin_rad|| partfillbin < inner_bin_rad) {
+	//	hPhotonAtSurface->SetBinContent(j, 0);
+	//}
     float zpos = 105.2;
     float radius = sqrt(xpos * xpos + ypos * ypos);
     float theta = atan2(radius, zpos);
@@ -540,6 +627,7 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   float low_ave=hIntensityRadius->Integral(bounds[0][0],bounds[0][1])/diffs[0];
   float high_ave=hIntensityRadius->Integral(bounds[2][0],bounds[2][1])/diffs[2];
   float ratio_ave=central_ave/low_ave; // how much brighter is central than low?
+  float outer_ratio_ave = central_ave / high_ave; // how much brighter is central than outer?
   float asymmetry=(low_ave-high_ave)/(low_ave+high_ave); //how much brighter is low than high?
   //hIntensity->GetXaxis()->GetBinLowEdge([0][0]);
   //hIntensity->GetXaxis()->GetBinLowEdge([0][0]);
@@ -556,6 +644,7 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   c->cd(5);
   hIntensityRadius->Draw("hist");
   hIntensityRadius->SaveAs(Form("hIntensityRadius.%s.hist.root",canvasname));
+  hPhotonAtSurface->SaveAs(Form("hPhotonAtSurface.%s.hist.root", canvasname));
   float x0, y0, x1, y1; 
   TLine* line = new TLine(x0, y0, x1, y1); 
   line->SetLineColor(kRed);
@@ -633,6 +722,49 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   PhotonSurvival->SetBarWidth(0.5);
   //PhotonSurvival->SetBarOffset(0.1);
   PhotonSurvival->Draw("bar");
+  //canvas to draw and divide cm intersection histograms
+  TCanvas* hphotratiocanvas = new TCanvas(Form("hphotratiocanvas_%s",  canvasname),"hphotratiocanvas", 900, 600);
+  hphotratiocanvas->Divide(2, 2);
+  hphotratiocanvas->cd(1);
+  hPhotonAtSurface->Draw("COLZ");
+  hphotratiocanvas->cd(2);
+  //hPhotonAtSurface_negate->Draw("COLZ");
+
+  hPhotonAtSurface_normal_to_negate_ratio = (TH2F*)hPhotonAtSurface->Clone();
+  hPhotonAtSurface_normal_to_negate_ratio->GetXaxis()->SetTitle(" ");
+  hPhotonAtSurface_normal_to_negate_ratio->GetYaxis()->SetTitle(" ");
+  hPhotonAtSurface_normal_to_negate_ratio->SetTitle("Photon/Nominal_Photons -1");
+
+  TFile* nom = NULL;
+  nom=TFile::Open("0degree_off_axis_rot.root");
+  TH2F* hnominal = NULL;\
+	  if (nom != NULL) {
+		  hnominal = (TH2F*)(nom->Get("hPhotonAtSurface"));
+	  }
+  if(hnominal!=NULL){
+  hPhotonAtSurface_normal_to_negate_ratio->Divide(hnominal);
+  hnominal->Draw("COLZ");
+  }
+  for (int j = 0; j < nCells; j++) {
+	  int binx, biny, binz;
+	  hPhotonAtSurface_normal_to_negate_ratio->GetBinXYZ(j, binx, biny, binz);//get the per-axis bins(bin number, not position) for this global bin
+	  float xpos = hPhotonAtSurface_normal_to_negate_ratio->GetXaxis()->GetBinCenter(binx);
+	  float ypos = hPhotonAtSurface_normal_to_negate_ratio->GetYaxis()->GetBinCenter(biny);
+	  float partfillbin = xpos * xpos + ypos * ypos;
+	  if (partfillbin > outer_bin_rad || partfillbin < inner_bin_rad) {
+		  hPhotonAtSurface_normal_to_negate_ratio->SetBinContent(j, 0);
+	  }
+	  float content = hPhotonAtSurface_normal_to_negate_ratio->GetBinContent(j);
+	  if (content > 0)
+	  {
+		  hPhotonAtSurface_normal_to_negate_ratio->SetBinContent(j,content-1);
+	  }
+  }
+
+
+  hphotratiocanvas->cd(3);
+  hPhotonAtSurface_normal_to_negate_ratio->Draw("COLZ");
+  hphotratiocanvas->SaveAs(Form("Hist_ratio_%s.pdf", canvasname));
   //*/
   //
   c->SaveAs(Form("%s.pdf",canvasname));
@@ -640,6 +772,8 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   std::vector<float> vecD;
   vecD.push_back(ratio_ave);
   vecD.push_back(light_fraction);
+  vecD.push_back(asymmetry);
+  vecD.push_back(outer_ratio_ave);
   return vecD;
     }
 
@@ -791,3 +925,25 @@ TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float leng
   }
   return hist;
 }
+/*
+TH2F* Create_histogram_from_quadrant(Th2F Histname, int quadrant) {
+
+
+	int NBins = 100;
+	float Full_Length = length;//cm; length of histogram
+	float Fiber_Scale = Full_Length / NBins; // Length of one bin in cm
+
+
+	TH2F* hist = new TH2F(Form("h%s", profname), Form("2D Output from %s;x position(cm);y position(cm)", profname), NBins, -Full_Length / 2, Full_Length / 2, NBins, -Full_Length / 2, Full_Length / 2);
+
+
+	for (int i = 0; i < NBins; i++) {
+		float x_i = (-Full_Length / 2) + (i + 0.5) * Fiber_Scale;
+		for (int j = 0; j < NBins; j++) {
+			float y_i = (-Full_Length / 2) + (j + 0.5) * Fiber_Scale;
+			hist->Fill(x_i, y_i, exp(-(0.5) * pow(((x_i * x_i) / (sigma_x * sigma_x) + (y_i * y_i) / (sigma_y * sigma_y)), power)));
+		}
+	}
+	return hist;
+}
+*/
