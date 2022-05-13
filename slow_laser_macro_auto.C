@@ -7,7 +7,8 @@ TH2F* LoadLaserProfileFromExponential(const char* profname, float sigma, float l
 bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_origin, float radius, float zf ); //return true if a photon traverses a cylinder  of radius r between its starting point and zf
 bool HitsIFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 21.57,105.2);};// changed from 17.25
 bool HitsOFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 76.42,105.2);};// changed from 80
-
+int PhotonPortRatio(int nLasers, float PortRatio);
+int InRange(int num, struct storeRANGE range);
 
 //and the main feature:  set up n lasers at a definted tilt angle and a specified itnensity on a card at a distace dist away.
 //                       run that laser through nDiffusers with a transmission of diffTrans each, and the given profile
@@ -97,7 +98,7 @@ std::vector<float> AngLe;
 std::vector<float> Outer_Ave_Ratio;
 //std::vector<float> Prism_Angle;
   //for (int prismAngle_itt = -20; prismAngle_itt < 20; prismAngle_itt++) {//*/
-for (int laser_tilt_angle_itt = 0; laser_tilt_angle_itt < 20; laser_tilt_angle_itt++) {//*/
+for (int laser_tilt_angle_itt = 0; laser_tilt_angle_itt < 2; laser_tilt_angle_itt++) {//*/
 	 vecI=SimulateLasers(nLasers, laser_tilt_angle_itt, hIntensity,dist,
 		  nDiffusers, EdTransPercentile, fEdAngle,
 		  nPrisms, 100, prismIndex, 0,
@@ -306,6 +307,7 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   
   for (int i = 0; i < nPhotons; i++) {
     int L = i % nLasers;//%%%%%%%%%change weights here. this is the crucial step.
+	//int L=PhotonPortRatio(nLasers,PortRatio);
 	int photonstep = 0;
 	//PhotonSurvival->Fill("GenP",1); photonstep++;
 	PhotonSurvival->Fill(photonstep); photonstep++;
@@ -945,64 +947,53 @@ TH2F* Create_histogram_from_quadrant(Th2F Histname, int quadrant) {
 }
 */
 
-
-/*
+///*
 //define a range
-
-{
- //need range number(nlasers), weights for each
- //want to be independent of set min max, so I will make it adjust size based on weight, as desired.
- //nlasers*10, then subdivide this global range into #nlasers parts.
-
-
-
- struct storeRANGE {int min; int max; int range;};//create structure to hold min, max, and identifying number
-
-int InRange(int num, struct storeRANGE range){
+struct storeRANGE {int min; int max; int range;};//create structure to hold min, max, and identifying number
+ int InRange(int num, struct storeRANGE range){
     // given a number and a range identifying number, check if the given number is in the range identified 
 	   if (num >= range.min && num <= range.max)
 		return 1;
 	else 
 		return 0;
  }
-
-
-
-
-
+int PhotonPortRatio(int nLasers, float PortRatio)
+{
+ //need range number(nlasers), weights for each
+ //want to be independent of set min max, so I will make it adjust size based on weight, as desired.
+ //nlasers*10, then subdivide this global range into #nlasers parts.
  //assign length of ranges
 
    int sum = 0;
    float mintemp=0;
    float rangesize[]={0};
-   for(int i = 0; i<nlasers ; i++){
-	  sum+=weight[i];//this part only needs to be done once per execution so it should be outside
+   for(int i = 0; i<nLasers ; i++){
+	  sum+= PortRatio[i];//this part only needs to be done once per execution so it should be outside
    }  
 
-   for(int i = 0; i<nlasers ; i++){
+   for(int i = 0; i<nLasers ; i++){
 	  //rangesize[i]=weight[i]/sum ;
 		if(i!=0){mintemp=max.range[i-1]+1;	
 	    }
-	  struct RANGE range=[mintemp,mintemp+round(nlasers*10*weight[i]/sum,i];
+	  struct storeRANGE range=[mintemp,mintemp + round(nLasers*10*weight[i]/sum),i];
 	  rangesize.push_back();
+	  list.push_back(range);
 	  }
 
  //roll from [0,nlaser*10] and choose that laser
 
 
  TRandom3 * ran = new TRandom3();
- int randrange=ran->Integer(nlaser*10); // generate number
+ int randrange=ran->Integer(nLasers*10); // generate number
 
 
- for (int i = 0; i < nlasers; i++)// check which range random number is in.
-	{
-		struct RANGE l = list.at(i);
+ for (int i = 0; i < nLasers; i++){// check which range random number is in.
+		struct storeRANGE l = list.at(i);
 		int included = InRange(randrange, l);
-		}
-if (included)
-		{
+	}
+     if (included){
 				int	L=i;
-		}
+	 }
  return L;
  }
-*/
+//*/
