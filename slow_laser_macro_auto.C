@@ -3,37 +3,11 @@ const TVector3 DiffusePhoton(const TVector3 photon_direction, TF1* angleDist); /
 TH2F* LoadLaserProfileFromFile(const char *profname,const char*tuplefile,const char *tuplename, float length);//build a 2D intensity profile from a file containing a 1D ntuple, and name the resulting profile 'profname'.  The total number of entries span a length of 'length' in cm.
 TH2F* LoadLaserProfileFromFile2(const char* profname, const char* tuplefile, const char* tuplename, float length, float center);//version 2 of the above. monte carlo method
 TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float length, float power=1.0); //build a 2D intensity profile from a 1D gaussian with sigma 'sigma'cm spanning a length 'length' in cm.
+TH2F* LoadLaserProfileFromExponential(const char* profname, float sigma, float length); //build a 2D intensity profile from a 1D exponential with sigma 'sigma'cm spanning a length 'length' in cm.
 bool HitsCylinder(const TVector3 photon_direction, const TVector3 photon_origin, float radius, float zf ); //return true if a photon traverses a cylinder  of radius r between its starting point and zf
 bool HitsIFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 21.57,105.2);};// changed from 17.25
 bool HitsOFC(const TVector3 photon_direction,const TVector3 photon_origin){ return HitsCylinder(photon_direction,photon_origin, 76.42,105.2);};// changed from 80
 
-TH2F* LoadLaserProfileFromExponential(const char* profname, float sigma, float length) {
-	double sigma_ideal = sigma;
-	double sigma_y = sigma_ideal;
-	double sigma_x = sigma_ideal;
-
-	int NBins = 100;
-	float Full_Length = length;//cm; length of histogram
-	float Fiber_Scale = Full_Length / NBins; // Length of one bin in cmd
-
-
-	TH2F* hist = new TH2F(Form("h%s", profname), Form("2D Output from %s;x position(cm);y position(cm)", profname), NBins, -Full_Length / 2, Full_Length / 2, NBins, -Full_Length / 2, Full_Length / 2);
-
-
-	for (int i = 0; i < NBins; i++) {
-		float x_i = (-Full_Length / 2) + (i + 0.5) * Fiber_Scale;
-		for (int j = 0; j < NBins; j++) {
-			float y_i = (-Full_Length / 2) + (j + 0.5) * Fiber_Scale;
-			hist->Fill(x_i, y_i, exp(-(abs(x_i) + abs(y_i) / sigma_ideal)));
-		}
-	}
-	return hist;
-}
-
-																			   /*
-
-
-//*/
 
 //and the main feature:  set up n lasers at a definted tilt angle and a specified itnensity on a card at a distace dist away.
 //                       run that laser through nDiffusers with a transmission of diffTrans each, and the given profile
@@ -49,13 +23,13 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
 void slow_laser_macro_auto() {
 
   const int nLasers = 12;
-  int nDiffusers = 1;
+  int nDiffusers = 1.0;
   float laserthetaparameter=0.1;// only meaningful when not using source file
   float laser_tilt_angle = 10;
-  float prismAngle = 0;
+  float prismAngle = 0.0;
   //float prismIndex = 1.0;
   float prismIndex = 1.500029;
-  float nPrisms = 0;
+  float nPrisms = 0.0;
   int DiffuseBounds = 80;// change to 55 for ed50, 80 for ed40
   float dist=34.5;// distance to profile card was 11 for bob; Ross's measurement 5/3 is 35-.5cm=34.5 cm
   //set up the diffuser parameters:
@@ -123,11 +97,11 @@ std::vector<float> AngLe;
 std::vector<float> Outer_Ave_Ratio;
 //std::vector<float> Prism_Angle;
   //for (int prismAngle_itt = -20; prismAngle_itt < 20; prismAngle_itt++) {//*/
-for (int laser_tilt_angle_itt = 10; laser_tilt_angle_itt < 11; laser_tilt_angle_itt++) {//*/
+for (int laser_tilt_angle_itt = 0; laser_tilt_angle_itt < 20; laser_tilt_angle_itt++) {//*/
 	 vecI=SimulateLasers(nLasers, laser_tilt_angle_itt, hIntensity,dist,
 		  nDiffusers, EdTransPercentile, fEdAngle,
 		  nPrisms, 100, prismIndex, 0,
-		  Form("5-3_fiber_SculptedTip_deviation_0-5_TiltedFiber_Ed40Diffuser_Angle%d_%s", laser_tilt_angle_itt,Time));
+		  Form("5-3_fiber_SculptedTip_deviation_0-0_TiltedFiber_Ed40Diffuser_Angle%d_%s", laser_tilt_angle_itt,Time));
   // comment out the brace below if not running loop oversomething;Form("5-3_fiber_sigma-%2.1f_TiltedFiber_Ed40Diffuser_Angle%d", fsigma,laser_tilt_angle_itt));
 	  /////*//
 	 /*printf("ratio, yield=%f,%f\n", vecI[1],vecI[0]);*/
@@ -222,7 +196,7 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   //
   TH1F* PhotonSurvival = new TH1F("PhotonSurvival","Photon Survival at various stages", 16, -0.5, 15.5);
   //laser deviation
-  float Laser_deviation = 10.0*TMath::Pi() / 180.0;//pi/360 is half degree deviation
+  float Laser_deviation = 0.0*TMath::Pi() / 180.0;//pi/360 is half degree deviation
   int nlaser_deviated = 0;
   //rotate each laser to the proper position and update the beam nominal and transverse direction.
   for (int i = 0; i < nLasers; i++)
@@ -241,7 +215,7 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
       //rotate the position of the laser: //determine sensitivity of laser position
       laser_position[i].RotateZ(laser_position_angle0 + angle_increment * i);
 	  //*
-	  if (i == nlaser_deviated)
+	  //if (i == nlaser_deviated)
 		  //laser_position[i].RotateZ(Laser_deviation);
 		  laser_nominal[i].RotateZ(Laser_deviation);//*/
 	 
@@ -301,7 +275,7 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   //conceptually, point backward from the intersection point in the negative laser direction until we hit the plane defined by the laser direction and the laser position. This tells us the 
 
   //when in doubt, google "root [class]" like "root TH2F"
-  int histogram_bin_number = 1 * 40;
+  int histogram_bin_number = 2 * 40;
   // TH2F(name, title and axes, number of bins, minimum coordinate, maximum, number of y bins, minimum, maximum)
   TH2F* hPhotonAtSurface = new TH2F("hPhotonAtSurface", "Photon Position At CM;x(cm);y(cm)", histogram_bin_number, -100, 100, histogram_bin_number, -100, 100);
   TH2F* hPhotonAtSurface_negate = new TH2F("hPhotonAtSurface_negate", "Photon Position At CM negated;-x(cm);-y(cm)", histogram_bin_number, -100, 100, histogram_bin_number, -100, 100);
@@ -331,7 +305,7 @@ std::vector<float> SimulateLasers(int nLasers, float laser_tilt_angle,TH2F *hInt
   //****End Loss Parameters
   
   for (int i = 0; i < nPhotons; i++) {
-    int L = i % nLasers;
+    int L = i % nLasers;//%%%%%%%%%change weights here. this is the crucial step.
 	int photonstep = 0;
 	//PhotonSurvival->Fill("GenP",1); photonstep++;
 	PhotonSurvival->Fill(photonstep); photonstep++;
@@ -925,6 +899,29 @@ TH2F* LoadLaserProfileFromGaussian(const char *profname, float sigma, float leng
   }
   return hist;
 }
+
+TH2F* LoadLaserProfileFromExponential(const char* profname, float sigma, float length) {
+	double sigma_ideal = sigma;
+	double sigma_y = sigma_ideal;
+	double sigma_x = sigma_ideal;
+
+	int NBins = 100;
+	float Full_Length = length;//cm; length of histogram
+	float Fiber_Scale = Full_Length / NBins; // Length of one bin in cmd
+
+
+	TH2F* hist = new TH2F(Form("h%s", profname), Form("2D Output from %s;x position(cm);y position(cm)", profname), NBins, -Full_Length / 2, Full_Length / 2, NBins, -Full_Length / 2, Full_Length / 2);
+
+
+	for (int i = 0; i < NBins; i++) {
+		float x_i = (-Full_Length / 2) + (i + 0.5) * Fiber_Scale;
+		for (int j = 0; j < NBins; j++) {
+			float y_i = (-Full_Length / 2) + (j + 0.5) * Fiber_Scale;
+			hist->Fill(x_i, y_i, exp(-(abs(x_i) + abs(y_i) / sigma_ideal)));
+		}
+	}
+	return hist;
+}
 /*
 TH2F* Create_histogram_from_quadrant(Th2F Histname, int quadrant) {
 
@@ -946,4 +943,66 @@ TH2F* Create_histogram_from_quadrant(Th2F Histname, int quadrant) {
 	}
 	return hist;
 }
+*/
+
+
+/*
+//define a range
+
+{
+ //need range number(nlasers), weights for each
+ //want to be independent of set min max, so I will make it adjust size based on weight, as desired.
+ //nlasers*10, then subdivide this global range into #nlasers parts.
+
+
+
+ struct storeRANGE {int min; int max; int range;};//create structure to hold min, max, and identifying number
+
+int InRange(int num, struct storeRANGE range){
+    // given a number and a range identifying number, check if the given number is in the range identified 
+	   if (num >= range.min && num <= range.max)
+		return 1;
+	else 
+		return 0;
+ }
+
+
+
+
+
+ //assign length of ranges
+
+   int sum = 0;
+   float mintemp=0;
+   float rangesize[]={0};
+   for(int i = 0; i<nlasers ; i++){
+	  sum+=weight[i];//this part only needs to be done once per execution so it should be outside
+   }  
+
+   for(int i = 0; i<nlasers ; i++){
+	  //rangesize[i]=weight[i]/sum ;
+		if(i!=0){mintemp=max.range[i-1]+1;	
+	    }
+	  struct RANGE range=[mintemp,mintemp+round(nlasers*10*weight[i]/sum,i];
+	  rangesize.push_back();
+	  }
+
+ //roll from [0,nlaser*10] and choose that laser
+
+
+ TRandom3 * ran = new TRandom3();
+ int randrange=ran->Integer(nlaser*10); // generate number
+
+
+ for (int i = 0; i < nlasers; i++)// check which range random number is in.
+	{
+		struct RANGE l = list.at(i);
+		int included = InRange(randrange, l);
+		}
+if (included)
+		{
+				int	L=i;
+		}
+ return L;
+ }
 */
